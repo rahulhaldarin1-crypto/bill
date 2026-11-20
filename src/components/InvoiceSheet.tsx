@@ -310,7 +310,7 @@ export const InvoiceSheet: React.FC<InvoiceSheetProps> = ({
               </span>
             </div>
             <div className="mt-1">
-              {resolvedTrackingUrl ? (
+              {/^https?:\/\//i.test(resolvedTrackingUrl) ? (
                 <a
                   href={resolvedTrackingUrl}
                   target="_blank"

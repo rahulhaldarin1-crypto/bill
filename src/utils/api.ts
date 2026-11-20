@@ -55,19 +55,6 @@ async function request<T>(
 }
 
 export const api = {
-  async register(payload: { name: string; email: string; password: string }) {
-    const data = await request<{
-      token: string;
-      user: UserAccount;
-      workspace: WorkspaceData;
-    }>('/api/auth/register', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    });
-    setStoredToken(data.token);
-    return data;
-  },
-
   async login(payload: { email: string; password: string }) {
     const data = await request<{
       token: string;
@@ -229,5 +216,11 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(workspace),
     });
+  },
+
+  async searchPublicBills(query: string) {
+    return request<{
+      results: Array<{ invoice: Invoice; settings: BusinessSettings }>;
+    }>(`/api/public/bills?q=${encodeURIComponent(query.trim())}`);
   },
 };

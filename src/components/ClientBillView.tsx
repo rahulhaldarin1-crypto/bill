@@ -31,7 +31,7 @@ import {
   todayIsoDate,
 } from '../utils/calculations';
 import { ConfirmModal } from './ConfirmModal';
-import { InvoiceSheet } from './InvoiceSheet';
+import { ScaledInvoicePreview } from './ScaledInvoicePreview';
 
 interface ClientBillViewProps {
   settings: BusinessSettings;
@@ -1048,13 +1048,13 @@ export const ClientBillView: React.FC<ClientBillViewProps> = ({
           </div>
 
           {/* RIGHT: LIVE PRINTABLE A4 INVOICE PREVIEW */}
-          <div className="overflow-x-auto bg-[#F4ECF8]/60 rounded-2xl border border-[#EFE2F5] p-4 flex flex-col items-center">
-            <div className="no-print w-full max-w-[794px] flex items-center justify-between text-xs text-[#6B5B7B] mb-3">
+          <div className="bg-[#F4ECF8]/60 rounded-2xl border border-[#EFE2F5] p-3 sm:p-4 flex flex-col items-center">
+            <div className="no-print w-full max-w-[794px] flex items-center justify-between text-xs text-[#6B5B7B] mb-2">
               <span>Live Invoice Preview</span>
               <span className="font-mono-num">A4 · PDF Ready</span>
             </div>
-            <div className="print-sheet-wrapper shadow-lg">
-              <InvoiceSheet
+            <div className="w-full max-w-[794px]">
+              <ScaledInvoicePreview
                 invoice={previewInvoice}
                 settings={settings}
                 sheetRef={sheetRef}

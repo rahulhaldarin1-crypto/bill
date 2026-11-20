@@ -6,9 +6,9 @@ import {
   Settings,
   Users,
 } from 'lucide-react';
-import { AuthView } from './components/AuthView';
 import { ClientBillView } from './components/ClientBillView';
 import { ClientListView } from './components/ClientListView';
+import { StartPortal } from './components/StartPortal';
 import { DashboardView } from './components/DashboardView';
 import { DeliveryTrackingView } from './components/DeliveryTrackingView';
 import { NewClientView } from './components/NewClientView';
@@ -48,6 +48,7 @@ export default function App() {
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [billClientId, setBillClientId] = useState<string | null>(null);
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
+  const [showViewPanel, setShowViewPanel] = useState(false);
 
   const [toast, setToast] = useState<string | null>(null);
 
@@ -342,12 +343,15 @@ export default function App() {
     );
   }
 
-  if (!user) {
+  if (!user || showViewPanel) {
     return (
-      <AuthView
+      <StartPortal
+        isLoggedIn={Boolean(user)}
+        onBackToDashboard={() => setShowViewPanel(false)}
         onAuthenticated={(authUser, authWorkspace) => {
           setUser(authUser);
           setWorkspace(authWorkspace);
+          setShowViewPanel(false);
           setRoute('dashboard');
           setHistory([]);
         }}
@@ -420,6 +424,7 @@ export default function App() {
           <DashboardView
             workspace={workspace}
             onNavigate={(nextRoute) => navigateTo(nextRoute)}
+            onOpenViewPanel={() => setShowViewPanel(true)}
           />
         )}
 

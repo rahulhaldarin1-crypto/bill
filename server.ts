@@ -379,54 +379,14 @@ async function startServer(): Promise<void> {
     res.json({ status: 'ok', app: 'Glamour Galleria' });
   });
 
-  // AUTH ROUTES
-  app.post('/api/auth/register', async (req: Request, res: Response) => {
-    const name = String(req.body?.name || '').trim();
-    const email = String(req.body?.email || '').trim().toLowerCase();
-    const password = String(req.body?.password || '');
-
-    if (!name || name.length < 2) {
-      res.status(400).json({ error: 'Please enter your full name (at least 2 characters).' });
-      return;
-    }
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      res.status(400).json({ error: 'Please enter a valid email address.' });
-      return;
-    }
-    if (password.length < 6) {
-      res.status(400).json({ error: 'Password must be at least 6 characters long.' });
-      return;
-    }
-
-    const exists = dbState.users.find((u) => u.email === email);
-    if (exists) {
-      res.status(409).json({ error: 'An account with this email already exists. Please sign in.' });
-      return;
-    }
-
-    const { hash, salt } = hashPassword(password);
-    const user: StoredUser = {
-      id: `usr-${crypto.randomUUID()}`,
-      name,
-      email,
-      passwordHash: hash,
-      salt,
-      createdAt: new Date().toISOString(),
-    };
-
-    dbState.users.push(user);
-    const workspace = getOrCreateWorkspace(user.id);
-    await persistDatabase();
-
-    const token = createAuthToken(user.id);
-    res.status(201).json({
-      token,
-      user: { id: user.id, name: user.name, email: user.email, createdAt: user.createdAt },
-      workspace,
+  // AUTH ROUTES (Owner Login Only — Public Registration Disabled)
+  app.post('/api/auth/register', (_req: Request, res: Response) => {
+    res.status(403).json({
+      error: 'Account registration is disabled. Please sign in with the owner account.',
     });
   });
 
-  app.post('/api/auth/login', (req: Request, res: Response) => {
+  app.post('/api/auth/login', async (req: Request, res: Response) => {
     const email = String(req.body?.email || '').trim().toLowerCase();
     const password = String(req.body?.password || '');
 
@@ -435,8 +395,33 @@ async function startServer(): Promise<void> {
       return;
     }
 
-    const user = dbState.users.find((u) => u.email === email);
-    if (!user || !verifyPassword(password, user.salt, user.passwordHash)) {
+    const envEmail = (process.env.ADMIN_EMAIL || '').trim().toLowerCase();
+    const envPassword = process.env.ADMIN_PASSWORD || '';
+
+    let user = dbState.users.find((u) => u.email === email);
+
+    if (envEmail && envPassword && email === envEmail) {
+      const a = Buffer.from(password);
+      const b = Buffer.from(envPassword);
+      if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+        res.status(401).json({ error: 'Invalid email or password.' });
+        return;
+      }
+      if (!user) {
+        const { hash, salt } = hashPassword(envPassword);
+        user = {
+          id: `usr-${crypto.randomUUID()}`,
+          name: 'Owner',
+          email: envEmail,
+          passwordHash: hash,
+          salt,
+          createdAt: new Date().toISOString(),
+        };
+        dbState.users.push(user);
+        getOrCreateWorkspace(user.id);
+        await persistDatabase();
+      }
+    } else if (!user || !verifyPassword(password, user.salt, user.passwordHash)) {
       res.status(401).json({ error: 'Invalid email or password.' });
       return;
     }
@@ -886,6 +871,81 @@ async function startServer(): Promise<void> {
     dbState.workspaces[req.authUser!.id] = restored;
     await persistDatabase();
     res.json(restored);
+  });
+
+  // PUBLIC VIEW PANEL ROUTE (Order Number / Client Name Lookup - sanitized, no internal cost/profit data)
+  app.get('/api/public/bills', (req: Request, res: Response) => {
+    const rawQuery = String(req.query.q || '').trim();
+    if (rawQuery.length < 2) {
+      res.status(400).json({
+        error: 'Please enter at least 2 characters (Order / Invoice Number or Client Name).',
+      });
+      return;
+    }
+
+    const qLower = rawQuery.toLowerCase();
+    const qDigits = rawQuery.replace(/[^\d]/g, '');
+
+    interface PublicBillResult {
+      invoice: StoredInvoice;
+      settings: StoredWorkspace['settings'];
+    }
+
+    const matches: PublicBillResult[] = [];
+
+    for (const workspace of Object.values(dbState.workspaces)) {
+      if (!workspace || !Array.isArray(workspace.invoices)) continue;
+      const clients = Array.isArray(workspace.clients) ? workspace.clients : [];
+
+      for (const inv of workspace.invoices) {
+        const linkedClient = clients.find((c) => c.id === inv.clientId);
+        const clientName = linkedClient ? String(linkedClient.name || '') : '';
+        const invNum = String(inv.invoiceNumber || '').toLowerCase();
+        const custName = String(inv.customerName || '').toLowerCase();
+        const trackingNum = String(inv.trackingNumber || '').toLowerCase();
+        const mobileDigits = String(inv.customerMobile || '').replace(/[^\d]/g, '');
+
+        const isMatch =
+          invNum.includes(qLower) ||
+          custName.includes(qLower) ||
+          clientName.toLowerCase().includes(qLower) ||
+          (trackingNum && trackingNum.includes(qLower)) ||
+          (qDigits.length >= 4 && mobileDigits.includes(qDigits));
+
+        if (!isMatch) continue;
+
+        const sanitizedInvoice: StoredInvoice = {
+          ...inv,
+          totalPurchaseCost: 0,
+          profitAmount: 0,
+          notes: '',
+          items: Array.isArray(inv.items)
+            ? inv.items.map((item) => ({
+                ...item,
+                purchasePrice: 0,
+                lineCost: 0,
+                lineProfit: 0,
+              }))
+            : [],
+        };
+
+        const publicSettings: StoredWorkspace['settings'] = {
+          ...createDefaultWorkspace().settings,
+          ...(workspace.settings || {}),
+          lowStockThreshold: 5,
+        };
+
+        matches.push({ invoice: sanitizedInvoice, settings: publicSettings });
+      }
+    }
+
+    matches.sort((a, b) =>
+      String(b.invoice.invoiceDate || b.invoice.createdAt).localeCompare(
+        String(a.invoice.invoiceDate || a.invoice.createdAt)
+      )
+    );
+
+    res.json({ results: matches.slice(0, 20) });
   });
 
   const isDev = process.env.NODE_ENV === 'development' || !fs.existsSync(DIST_INDEX);

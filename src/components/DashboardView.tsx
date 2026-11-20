@@ -6,6 +6,7 @@ import {
   CreditCard,
   FilePlus2,
   Package,
+  Search,
   Settings,
   TrendingUp,
   Truck,
@@ -19,6 +20,7 @@ import { BrandLogo } from './BrandLogo';
 interface DashboardViewProps {
   workspace: WorkspaceData;
   onNavigate: (route: AppRoute) => void;
+  onOpenViewPanel?: () => void;
 }
 
 interface MenuCard {
@@ -35,6 +37,7 @@ interface MenuCard {
 export const DashboardView: React.FC<DashboardViewProps> = ({
   workspace,
   onNavigate,
+  onOpenViewPanel,
 }) => {
   const { settings, clients, products, invoices, expenses } = workspace;
   const sym = settings.currencySymbol || '₹';
@@ -205,6 +208,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <UserPlus className="w-4 h-4 text-[#DB2777]" />
             <span>New Client</span>
           </button>
+          {onOpenViewPanel && (
+            <button
+              type="button"
+              onClick={onOpenViewPanel}
+              className="inline-flex items-center gap-2 rounded-xl border border-[#E6D9EE] bg-white px-4 py-3 text-sm font-semibold text-[#7E22CE] hover:border-[#9333EA] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+            >
+              <Search className="w-4 h-4" />
+              <span>View Panel</span>
+            </button>
+          )}
         </div>
       </section>
 
