@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ClipboardPaste, Plus, Trash2, ArrowRight } from 'lucide-react';
+import { ClipboardPaste, Plus, Trash2, ArrowRight, UserPlus } from 'lucide-react';
 import {
   COURIER_PRESETS,
   DEFAULT_CATALOG_PRESETS,
@@ -7,7 +7,7 @@ import {
   SIZE_CHOICES,
 } from '../data/defaults';
 import { Translations } from '../i18n/translations';
-import { InvoiceData, OrderItem, PaymentMethod } from '../types/invoice';
+import { ClientRecord, InvoiceData, OrderItem, PaymentMethod } from '../types/invoice';
 import {
   calculateTotals,
   formatMoney,
@@ -18,11 +18,19 @@ import {
 
 interface InvoiceFormProps {
   invoice: InvoiceData;
+  clients: ClientRecord[];
+  onSaveAsClient: (customer: InvoiceData['customer']) => void;
   onChange: (updated: InvoiceData) => void;
   t: Translations;
 }
 
-export const InvoiceForm: React.FC<InvoiceFormProps> = ({ invoice, onChange, t }) => {
+export const InvoiceForm: React.FC<InvoiceFormProps> = ({
+  invoice,
+  clients,
+  onSaveAsClient,
+  onChange,
+  t,
+}) => {
   const [pasteOpen, setPasteOpen] = useState(false);
   const [rawPasteText, setRawPasteText] = useState('');
 
@@ -171,19 +179,66 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({ invoice, onChange, t }
     <div className="space-y-6">
       {/* 1. CUSTOMER DETAILS */}
       <section className="pb-6 border-b border-[#E5E0D5]">
-        <div className="flex items-center justify-between gap-3 mb-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-3.5">
           <h2 className="text-sm font-semibold text-[#181613] tracking-tight">
             01. {t.sectionCustomer}
           </h2>
-          <button
-            type="button"
-            onClick={() => setPasteOpen((prev) => !prev)}
-            className="inline-flex items-center gap-1.5 rounded-md border border-[#D4C7AE] bg-[#FAF8F4] px-2.5 py-1.5 text-xs font-medium text-[#6B5422] hover:bg-[#F2ECE0] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
-          >
-            <ClipboardPaste className="w-3.5 h-3.5" />
-            <span>{t.quickPasteBtn}</span>
-          </button>
+          <div className="flex items-center gap-2">
+            {invoice.customer.name.trim() && (
+              <button
+                type="button"
+                onClick={() => onSaveAsClient(invoice.customer)}
+                className="inline-flex items-center gap-1 rounded-md border border-[#DDD7CB] bg-white px-2.5 py-1.5 text-xs font-medium text-[#181613] hover:bg-[#F2ECE0] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              >
+                <UserPlus className="w-3.5 h-3.5 text-[#7D6635]" />
+                <span>{t.saveToClients}</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setPasteOpen((prev) => !prev)}
+              className="inline-flex items-center gap-1.5 rounded-md border border-[#D4C7AE] bg-[#FAF8F4] px-2.5 py-1.5 text-xs font-medium text-[#6B5422] hover:bg-[#F2ECE0] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+            >
+              <ClipboardPaste className="w-3.5 h-3.5" />
+              <span>{t.quickPasteBtn}</span>
+            </button>
+          </div>
         </div>
+
+        {clients.length > 0 && (
+          <div className="mb-3.5">
+            <select
+              defaultValue=""
+              onChange={(e) => {
+                const chosen = clients.find((c) => c.id === e.target.value);
+                if (chosen) {
+                  onChange({
+                    ...invoice,
+                    clientId: chosen.id,
+                    customer: {
+                      name: chosen.name,
+                      phone: chosen.phone,
+                      address: chosen.address,
+                      cityPin: chosen.cityPin,
+                    },
+                    updatedAt: new Date().toISOString(),
+                  });
+                  e.target.value = '';
+                }
+              }}
+              className="w-full rounded-md border border-[#D4C7AE] bg-[#FAF7F0] px-3 py-2 text-xs font-medium text-[#4A4338] focus:border-[#A8822E] focus:outline-none cursor-pointer"
+            >
+              <option value="" disabled>
+                {t.selectSavedClient}
+              </option>
+              {clients.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name} {c.phone ? `(${c.phone})` : ''} {c.cityPin ? `· ${c.cityPin}` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {pasteOpen && (
           <div className="mb-4 rounded-lg border border-[#D4C7AE] bg-[#FAF7F0] p-3.5">
@@ -418,8 +473,13 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({ invoice, onChange, t }
                       min={1}
                       value={item.qty}
                       onChange={(e) =>
-                        updateItem(item.id, { qty: Math.max(1, parseInt(e.target.value || '1', 10)) })
+                        updateItem(item.id, {
+                          qty: e.target.value === '' ? '' : Math.max(1, parseInt(e.target.value, 10) || 1),
+                        })
                       }
+                      onBlur={() => {
+                        if (item.qty === '') updateItem(item.id, { qty: 1 });
+                      }}
                       className={`${inputClass} font-mono-num`}
                     />
                   </div>
@@ -527,10 +587,12 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({ invoice, onChange, t }
               onChange={(e) =>
                 onChange({
                   ...invoice,
-                  deliveryCharge: Math.max(0, Number(e.target.value || 0)),
+                  deliveryCharge:
+                    e.target.value === '' ? '' : Math.max(0, Number(e.target.value) || 0),
                   updatedAt: new Date().toISOString(),
                 })
               }
+              placeholder="0"
               className={`${inputClass} font-mono-num`}
             />
           </div>
@@ -545,10 +607,12 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({ invoice, onChange, t }
               onChange={(e) =>
                 onChange({
                   ...invoice,
-                  gstPercent: Math.max(0, Number(e.target.value || 0)),
+                  gstPercent:
+                    e.target.value === '' ? '' : Math.max(0, Number(e.target.value) || 0),
                   updatedAt: new Date().toISOString(),
                 })
               }
+              placeholder="0"
               className={`${inputClass} font-mono-num`}
             />
           </div>
@@ -606,13 +670,27 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({ invoice, onChange, t }
           </div>
         )}
 
-        <div className="mt-4 rounded-lg border border-[#DFD8C9] bg-[#FAF8F4] px-4 py-3 flex items-center justify-between">
-          <span className="text-xs font-semibold uppercase tracking-wide text-[#6B5422]">
-            Grand Total
-          </span>
-          <span className="font-mono-num text-lg font-bold text-[#181613]">
-            ₹ {formatMoney(totals.grandTotal)}
-          </span>
+        <div className="mt-4 rounded-lg border border-[#DFD8C9] bg-[#FAF8F4] px-4 py-3 space-y-1.5">
+          <div className="flex items-center justify-between text-xs text-[#5A5347]">
+            <span>Subtotal</span>
+            <span className="font-mono-num">₹ {formatMoney(totals.subtotal)}</span>
+          </div>
+          <div className="flex items-center justify-between text-xs text-[#5A5347]">
+            <span>Delivery Charge</span>
+            <span className="font-mono-num">₹ {formatMoney(totals.deliveryCharge)}</span>
+          </div>
+          <div className="flex items-center justify-between text-xs text-[#5A5347]">
+            <span>GST ({Number(invoice.gstPercent || 0)}%)</span>
+            <span className="font-mono-num">₹ {formatMoney(totals.gstAmount)}</span>
+          </div>
+          <div className="pt-2 border-t border-[#E4DEC9] flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wide text-[#6B5422]">
+              Grand Total (Auto)
+            </span>
+            <span className="font-mono-num text-lg font-bold text-[#181613]">
+              ₹ {formatMoney(totals.grandTotal)}
+            </span>
+          </div>
         </div>
       </section>
     </div>

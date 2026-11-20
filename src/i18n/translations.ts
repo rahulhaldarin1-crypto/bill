@@ -1,9 +1,12 @@
 import { Language } from '../types/invoice';
 
 export interface Translations {
+  navHome: string;
+  navClients: string;
   navBuilder: string;
   navSaved: string;
   navSettings: string;
+  backBtn: string;
   downloadPdf: string;
   downloadingPdf: string;
   printBill: string;
@@ -69,13 +72,57 @@ export interface Translations {
   saveSettings: string;
   resetDefaults: string;
   settingsSavedToast: string;
+  clientsTitle: string;
+  clientsSubtitle: string;
+  createClientTitle: string;
+  editClientTitle: string;
+  saveAndCreateBill: string;
+  saveClientOnly: string;
+  updateClient: string;
+  clientSavedToast: string;
+  clientDirectoryTitle: string;
+  clientSearchPlaceholder: string;
+  emptyClientsTitle: string;
+  emptyClientsDesc: string;
+  openBlankBill: string;
+  createBillForClient: string;
+  selectSavedClient: string;
+  saveToClients: string;
+  billsCountLabel: string;
+  backToClients: string;
+  clientOrdersTitle: string;
+  totalOrdersLabel: string;
+  totalSpentLabel: string;
+  lastOrderLabel: string;
+  newOrderForClient: string;
+  repeatOrder: string;
+  noClientOrdersTitle: string;
+  noClientOrdersDesc: string;
+  colOrderDate: string;
+  viewOrdersHint: string;
+  editingForClient: string;
+  homeCreateClient: string;
+  homeCreateClientDesc: string;
+  homeClientList: string;
+  homeClientListDesc: string;
+  homeMasterUserTitle: string;
+  homeMasterUserDesc: string;
+  homeBillsTitle: string;
+  homeBillsDesc: string;
+  allClientsFilter: string;
+  totalBilledLabel: string;
+  clientIdLabel: string;
+  clientProfileLabel: string;
 }
 
 export const TRANSLATIONS: Record<Language, Translations> = {
   en: {
+    navHome: 'Home',
+    navClients: 'Clients',
     navBuilder: 'Invoice Builder',
     navSaved: 'Saved Bills',
     navSettings: 'Store Settings',
+    backBtn: 'Back',
     downloadPdf: 'Download PDF',
     downloadingPdf: 'Generating PDF...',
     printBill: 'Print',
@@ -143,11 +190,55 @@ export const TRANSLATIONS: Record<Language, Translations> = {
     saveSettings: 'Save Settings',
     resetDefaults: 'Restore Defaults',
     settingsSavedToast: 'Store settings updated',
+    clientsTitle: 'Client Directory',
+    clientsSubtitle: 'Create a client profile first or pick an existing client to open the bill builder.',
+    createClientTitle: 'Create New Client',
+    editClientTitle: 'Edit Client',
+    saveAndCreateBill: 'Save Client & Create Bill',
+    saveClientOnly: 'Save Client',
+    updateClient: 'Update Client',
+    clientSavedToast: 'Client saved to directory',
+    clientDirectoryTitle: 'Saved Clients',
+    clientSearchPlaceholder: 'Search clients by name, phone, or PIN...',
+    emptyClientsTitle: 'No clients created yet',
+    emptyClientsDesc: 'Enter client details on the left and click "Save Client & Create Bill" to start billing.',
+    openBlankBill: 'Open Blank Bill',
+    createBillForClient: 'Create Bill',
+    selectSavedClient: 'Select saved client...',
+    saveToClients: 'Save Client',
+    billsCountLabel: 'orders',
+    backToClients: 'All Clients',
+    clientOrdersTitle: 'Order History',
+    totalOrdersLabel: 'Total Orders',
+    totalSpentLabel: 'Total Billed',
+    lastOrderLabel: 'Last Order',
+    newOrderForClient: 'New Order / Bill',
+    repeatOrder: 'Repeat',
+    noClientOrdersTitle: 'No orders recorded for this client yet',
+    noClientOrdersDesc: 'Click "New Order / Bill" to enter products, order date, and order number.',
+    colOrderDate: 'Order Date',
+    viewOrdersHint: 'Click name to view orders',
+    editingForClient: 'Client Profile',
+    homeCreateClient: 'Create New Client',
+    homeCreateClientDesc: 'Enter new client details and generate a bill.',
+    homeClientList: 'Client List',
+    homeClientListDesc: 'Open saved clients to view and add client bills.',
+    homeMasterUserTitle: 'Master User',
+    homeMasterUserDesc: 'Click to create and save a new client profile.',
+    homeBillsTitle: 'All Bills',
+    homeBillsDesc: 'View all clients’ saved bills gathered in one place.',
+    allClientsFilter: 'All Clients',
+    totalBilledLabel: 'Total Billed',
+    clientIdLabel: 'Client ID',
+    clientProfileLabel: 'Client Profile',
   },
   bn: {
+    navHome: 'হোম',
+    navClients: 'ক্লায়েন্ট',
     navBuilder: 'বিল তৈরি করুন',
     navSaved: 'সেভ করা বিল',
     navSettings: 'দোকান সেটিংস',
+    backBtn: 'ফিরে যান',
     downloadPdf: 'PDF সেভ করুন',
     downloadingPdf: 'PDF তৈরি হচ্ছে...',
     printBill: 'প্রিন্ট',
@@ -215,5 +306,46 @@ export const TRANSLATIONS: Record<Language, Translations> = {
     saveSettings: 'সেটিংস সেভ করুন',
     resetDefaults: 'ডিফল্ট ফিরিয়ে আনুন',
     settingsSavedToast: 'দোকানের সেটিংস সেভ হয়েছে',
+    clientsTitle: 'ক্লায়েন্ট তৈরি ও তালিকা',
+    clientsSubtitle: 'আগে ক্লায়েন্টের তথ্য তৈরি করুন বা তালিকা থেকে বেছে নিয়ে সাথে সাথে বিল তৈরির অপশনে যান।',
+    createClientTitle: 'নতুন ক্লায়েন্ট তৈরি করুন',
+    editClientTitle: 'ক্লায়েন্ট এডিট করুন',
+    saveAndCreateBill: 'ক্লায়েন্ট সেভ করে বিল তৈরি করুন',
+    saveClientOnly: 'শুধু ক্লায়েন্ট সেভ করুন',
+    updateClient: 'তথ্য আপডেট করুন',
+    clientSavedToast: 'ক্লায়েন্ট সেভ হয়েছে',
+    clientDirectoryTitle: 'সেভ করা ক্লায়েন্টসমূহ',
+    clientSearchPlaceholder: 'নাম, ফোন বা পিন দিয়ে ক্লায়েন্ট খুঁজুন...',
+    emptyClientsTitle: 'এখনো কোনো ক্লায়েন্ট তৈরি করা নেই',
+    emptyClientsDesc: 'বাম পাশের ফর্মে ক্লায়েন্টের তথ্য দিয়ে "ক্লায়েন্ট সেভ করে বিল তৈরি করুন" বাটনে ক্লিক করুন।',
+    openBlankBill: 'খালি বিল খুলুন',
+    createBillForClient: 'বিল তৈরি করুন',
+    selectSavedClient: 'সেভ করা ক্লায়েন্ট বাছুন...',
+    saveToClients: 'ক্লায়েন্ট সেভ করুন',
+    billsCountLabel: 'টি অর্ডার',
+    backToClients: 'সব ক্লায়েন্ট',
+    clientOrdersTitle: 'অর্ডার ইতিহাস (Order History)',
+    totalOrdersLabel: 'মোট অর্ডার',
+    totalSpentLabel: 'মোট বিল',
+    lastOrderLabel: 'শেষ অর্ডার',
+    newOrderForClient: 'নতুন অর্ডার / বিল যোগ করুন',
+    repeatOrder: 'রিপিট অর্ডার',
+    noClientOrdersTitle: 'এই ক্লায়েন্টের কোনো অর্ডার এখনো সেভ করা নেই',
+    noClientOrdersDesc: 'নতুন অর্ডার নম্বর ও তারিখ দিয়ে বিল তৈরি করতে "নতুন অর্ডার / বিল যোগ করুন" বাটনে ক্লিক করুন।',
+    colOrderDate: 'অর্ডারের তারিখ',
+    viewOrdersHint: 'অর্ডার দেখতে নামে ক্লিক করুন',
+    editingForClient: 'ক্লায়েন্ট প্রোফাইল',
+    homeCreateClient: 'Create New Client',
+    homeCreateClientDesc: 'নতুন ক্লায়েন্টের তথ্য এন্ট্রি করে বিল তৈরি করুন।',
+    homeClientList: 'Client List',
+    homeClientListDesc: 'সেভ করা ক্লায়েন্টদের প্রোফাইল ও সম্পূর্ণ তথ্য দেখুন।',
+    homeMasterUserTitle: 'Master User',
+    homeMasterUserDesc: 'নতুন ক্লায়েন্ট তৈরি ও সেভ করতে ক্লিক করুন।',
+    homeBillsTitle: 'Bill',
+    homeBillsDesc: 'সব ক্লায়েন্টের সমস্ত বিল এক জায়গায় দেখুন।',
+    allClientsFilter: 'সব ক্লায়েন্ট',
+    totalBilledLabel: 'মোট বিল',
+    clientIdLabel: 'ক্লায়েন্ট আইডি',
+    clientProfileLabel: 'ক্লায়েন্ট প্রোফাইল',
   },
 };

@@ -13,7 +13,7 @@ export function getItemUnitPrice(item: OrderItem): number {
 }
 
 export function getItemAmount(item: OrderItem): number {
-  const qty = Math.max(0, Number(item.qty) || 0);
+  const qty = item.qty === '' ? 0 : Math.max(0, Number(item.qty) || 0);
   const price = getItemUnitPrice(item);
   if (qty === 0 && price > 0) return 0;
   return Math.round(qty * price * 100) / 100;

@@ -62,7 +62,9 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
     invoice.paymentMethod === 'COD'
       ? invoice.codAmountOverride !== ''
         ? invoice.codAmountOverride
-        : formatMoney(totals.grandTotal)
+        : totals.grandTotal > 0
+          ? formatMoney(totals.grandTotal)
+          : ''
       : '';
 
   const qrToDisplay = settings.customQrDataUrl || generatedQrUrl;
@@ -630,7 +632,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
                 >
                   GST (if applicable){' '}
                   <span className="font-mono-num" style={{ color: '#D4AF56' }}>
-                    [{invoice.gstPercent > 0 ? `${invoice.gstPercent}` : ' '}]%
+                    [{Number(invoice.gstPercent || 0) > 0 ? `${invoice.gstPercent}` : ' '}]%
                   </span>
                 </td>
                 <td

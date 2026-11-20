@@ -1,473 +1,569 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { BookmarkCheck, Download, FilePlus2, Printer } from 'lucide-react';
-import { InvoiceForm } from './components/InvoiceForm';
-import { InvoicePreview } from './components/InvoicePreview';
-import { SavedBillsView } from './components/SavedBillsView';
-import { StoreSettingsView } from './components/StoreSettingsView';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
-  createBlankInvoice,
-  DEFAULT_STORE_SETTINGS,
-  INITIAL_SAMPLE_INVOICE,
-} from './data/defaults';
-import { TRANSLATIONS } from './i18n/translations';
-import { InvoiceData, Language, SavedInvoice, StoreSettings } from './types/invoice';
+  FilePlus2,
+  Home,
+  Package,
+  Settings,
+  Users,
+} from 'lucide-react';
+import { AuthView } from './components/AuthView';
+import { ClientBillView } from './components/ClientBillView';
+import { ClientListView } from './components/ClientListView';
+import { DashboardView } from './components/DashboardView';
+import { DeliveryTrackingView } from './components/DeliveryTrackingView';
+import { NewClientView } from './components/NewClientView';
+import { PaymentHistoryView } from './components/PaymentHistoryView';
+import { ProductsView } from './components/ProductsView';
+import { ProfitLossView } from './components/ProfitLossView';
+import { SalesReportView } from './components/SalesReportView';
+import { SettingsView } from './components/SettingsView';
 import {
-  buildPdfFilename,
-  calculateTotals,
-  exportElementToPdf,
-  incrementInvoiceNumber,
-} from './utils/invoiceHelpers';
+  AppRoute,
+  BusinessSettings,
+  Client,
+  DeliveryStatus,
+  ExpenseRecord,
+  Invoice,
+  PaymentMethod,
+  Product,
+  UserAccount,
+  WorkspaceData,
+} from './types/business';
+import { api, getStoredToken, setStoredToken } from './utils/api';
+import { createEmptyWorkspace } from './utils/calculations';
 
-type ActiveTab = 'builder' | 'saved' | 'settings';
-type ZoomMode = 'fit' | 0.75 | 1;
-
-const STORAGE_KEYS = {
-  SETTINGS: 'gg_invoice_store_settings_v1',
-  SAVED_BILLS: 'gg_invoice_saved_bills_v2',
-  DRAFT: 'gg_invoice_current_draft_v2',
-  LANG: 'gg_invoice_ui_lang_v1',
-};
-
-function loadInitialSettings(): StoreSettings {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEYS.SETTINGS);
-    if (raw) return { ...DEFAULT_STORE_SETTINGS, ...JSON.parse(raw) };
-  } catch {
-    // ignore storage errors
-  }
-  return DEFAULT_STORE_SETTINGS;
-}
-
-function loadInitialSavedBills(): SavedInvoice[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEYS.SAVED_BILLS);
-    if (raw) return JSON.parse(raw);
-  } catch {
-    // ignore storage errors
-  }
-  return [];
-}
-
-function loadInitialDraft(): InvoiceData {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEYS.DRAFT);
-    if (raw) return JSON.parse(raw);
-  } catch {
-    // ignore storage errors
-  }
-  return INITIAL_SAMPLE_INVOICE;
+interface HistoryEntry {
+  route: AppRoute;
+  clientId: string | null;
 }
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<ActiveTab>('builder');
-  const [lang, setLang] = useState<Language>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.LANG);
-      return saved === 'bn' ? 'bn' : 'en';
-    } catch {
-      return 'en';
-    }
-  });
-  const [settings, setSettings] = useState<StoreSettings>(loadInitialSettings);
-  const [savedInvoices, setSavedInvoices] = useState<SavedInvoice[]>(loadInitialSavedBills);
-  const [invoice, setInvoice] = useState<InvoiceData>(loadInitialDraft);
+  const [authChecking, setAuthChecking] = useState(true);
+  const [user, setUser] = useState<UserAccount | null>(null);
+  const [workspace, setWorkspace] = useState<WorkspaceData>(createEmptyWorkspace);
 
-  const [zoomMode, setZoomMode] = useState<ZoomMode>('fit');
-  const [fitScale, setFitScale] = useState<number>(0.78);
-  const [isExporting, setIsExporting] = useState(false);
-  const [toastMsg, setToastMsg] = useState<string | null>(null);
-  const [pdfRenderTarget, setPdfRenderTarget] = useState<InvoiceData | null>(null);
+  const [route, setRoute] = useState<AppRoute>('dashboard');
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+  const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const [billClientId, setBillClientId] = useState<string | null>(null);
+  const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
 
-  const previewStageRef = useRef<HTMLDivElement | null>(null);
-  const invoiceSheetRef = useRef<HTMLDivElement | null>(null);
-  const hiddenExportRef = useRef<HTMLDivElement | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
 
-  const t = TRANSLATIONS[lang];
-
-  // Persist draft, saved bills, settings, language
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.DRAFT, JSON.stringify(invoice));
-    } catch {
-      // ignore
-    }
-  }, [invoice]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.SAVED_BILLS, JSON.stringify(savedInvoices));
-    } catch {
-      // ignore
-    }
-  }, [savedInvoices]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
-    } catch {
-      // ignore
-    }
-  }, [settings]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.LANG, lang);
-    } catch {
-      // ignore
-    }
-  }, [lang]);
-
-  // Measure preview container to compute clean "Fit" scale for 794px A4 sheet
-  useEffect(() => {
-    const el = previewStageRef.current;
-    if (!el) return;
-
-    const updateScale = () => {
-      const available = el.clientWidth - 32;
-      if (available > 0) {
-        const computed = Math.min(1, Math.max(0.36, available / 794));
-        setFitScale(computed);
-      }
-    };
-
-    updateScale();
-    const observer = new ResizeObserver(updateScale);
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [activeTab]);
-
-  const showToast = useCallback((msg: string) => {
-    setToastMsg(msg);
+  const showToast = useCallback((message: string) => {
+    setToast(message);
     setTimeout(() => {
-      setToastMsg((prev) => (prev === msg ? null : prev));
+      setToast((prev) => (prev === message ? null : prev));
     }, 2600);
   }, []);
 
-  const upsertSavedInvoice = useCallback((target: InvoiceData) => {
-    const totals = calculateTotals(target);
-    const entry: SavedInvoice = {
-      ...target,
-      grandTotal: totals.grandTotal,
-      updatedAt: new Date().toISOString(),
-    };
-    setSavedInvoices((prev) => {
-      const existingIdx = prev.findIndex((item) => item.id === entry.id);
-      if (existingIdx >= 0) {
-        const clone = [...prev];
-        clone[existingIdx] = entry;
-        return clone;
-      }
-      return [entry, ...prev];
-    });
+  // Restore authenticated session on mount
+  useEffect(() => {
+    const token = getStoredToken();
+    if (!token) {
+      setAuthChecking(false);
+      return;
+    }
+
+    api
+      .fetchSession()
+      .then((data) => {
+        setUser(data.user);
+        setWorkspace(data.workspace);
+      })
+      .catch(() => {
+        setStoredToken(null);
+      })
+      .finally(() => {
+        setAuthChecking(false);
+      });
   }, []);
 
-  const handleSaveBill = () => {
-    upsertSavedInvoice(invoice);
-    showToast(t.billSavedToast);
+  const navigateTo = useCallback(
+    (
+      nextRoute: AppRoute,
+      options?: {
+        clientId?: string | null;
+        editClient?: Client | null;
+        forBillClientId?: string | null;
+        editInvoice?: Invoice | null;
+      }
+    ) => {
+      const nextClientId =
+        options?.clientId !== undefined ? options.clientId : null;
+
+      if (route !== nextRoute || selectedClientId !== nextClientId) {
+        setHistory((prev) => [
+          ...prev.slice(-24),
+          { route, clientId: selectedClientId },
+        ]);
+      }
+
+      if (options?.editClient !== undefined) {
+        setEditingClient(options.editClient);
+      } else if (nextRoute === 'new-client') {
+        setEditingClient(null);
+      }
+
+      if (options?.forBillClientId !== undefined) {
+        setBillClientId(options.forBillClientId);
+      } else if (nextRoute === 'client-bill' && options?.editInvoice === undefined) {
+        setBillClientId(null);
+      }
+
+      if (options?.editInvoice !== undefined) {
+        setEditingInvoice(options.editInvoice);
+      } else if (nextRoute === 'client-bill') {
+        setEditingInvoice(null);
+      }
+
+      setSelectedClientId(nextClientId);
+      setRoute(nextRoute);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    },
+    [route, selectedClientId]
+  );
+
+  const goBack = useCallback(() => {
+    if (history.length > 0) {
+      const prev = history[history.length - 1];
+      setHistory((h) => h.slice(0, -1));
+      setSelectedClientId(prev.clientId);
+      setRoute(prev.route);
+      return;
+    }
+    setSelectedClientId(null);
+    setRoute('dashboard');
+  }, [history]);
+
+  const handleSignOut = () => {
+    setStoredToken(null);
+    setUser(null);
+    setWorkspace(createEmptyWorkspace());
+    setRoute('dashboard');
+    setHistory([]);
   };
 
-  const handleNewBill = () => {
-    const latestInvNo = savedInvoices[0]?.meta.invoiceNo || invoice.meta.invoiceNo;
-    const nextInvNo = latestInvNo ? incrementInvoiceNumber(latestInvNo) : '';
-    setInvoice(createBlankInvoice(nextInvNo, settings));
-    setActiveTab('builder');
-  };
+  // CRUD HANDLERS
+  const handleSaveClient = async (
+    payload: Omit<Client, 'id' | 'createdAt' | 'updatedAt'>,
+    existingId?: string,
+    andCreateBill?: boolean
+  ) => {
+    if (existingId) {
+      const updated = await api.updateClient(existingId, payload);
+      setWorkspace((prev) => ({
+        ...prev,
+        clients: prev.clients.map((c) => (c.id === updated.id ? updated : c)),
+      }));
+      showToast('Customer details updated.');
+      navigateTo('client-list', { clientId: updated.id });
+      return;
+    }
 
-  const handleDownloadPdf = async () => {
-    if (isExporting) return;
-    setIsExporting(true);
-    try {
-      upsertSavedInvoice(invoice);
-      if (activeTab === 'builder' && invoiceSheetRef.current) {
-        await exportElementToPdf(invoiceSheetRef.current, buildPdfFilename(invoice));
-      } else {
-        setPdfRenderTarget(invoice);
-      }
-    } catch (err) {
-      console.error('PDF generation failed:', err);
-      showToast('PDF export failed. Try using Print.');
-    } finally {
-      if (activeTab === 'builder') {
-        setIsExporting(false);
-      }
+    const created = await api.createClient(payload);
+    setWorkspace((prev) => ({
+      ...prev,
+      clients: [created, ...prev.clients],
+    }));
+    showToast('New customer saved.');
+    if (andCreateBill) {
+      navigateTo('client-bill', { forBillClientId: created.id, editInvoice: null });
+    } else {
+      navigateTo('client-list', { clientId: created.id });
     }
   };
 
-  // Trigger offscreen PDF export when triggered from Saved Bills or non-builder tab
-  useEffect(() => {
-    if (!pdfRenderTarget || !hiddenExportRef.current) return;
-    let cancelled = false;
-    const run = async () => {
-      try {
-        await exportElementToPdf(hiddenExportRef.current!, buildPdfFilename(pdfRenderTarget));
-      } catch (err) {
-        console.error('PDF export failed:', err);
-      } finally {
-        if (!cancelled) {
-          setPdfRenderTarget(null);
-          setIsExporting(false);
-        }
-      }
-    };
-    run();
-    return () => {
-      cancelled = true;
-    };
-  }, [pdfRenderTarget]);
-
-  const handleDownloadSavedPdf = (saved: SavedInvoice) => {
-    if (isExporting) return;
-    setIsExporting(true);
-    setPdfRenderTarget(saved);
+  const handleDeleteClient = async (id: string) => {
+    await api.deleteClient(id);
+    setWorkspace((prev) => ({
+      ...prev,
+      clients: prev.clients.filter((c) => c.id !== id),
+    }));
+    showToast('Customer deleted.');
   };
 
-  const handleLoadSaved = (saved: SavedInvoice) => {
-    const { grandTotal: _gt, ...rest } = saved;
-    setInvoice(rest);
-    setActiveTab('builder');
+  const handleSaveProduct = async (
+    payload: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>,
+    existingId?: string
+  ) => {
+    if (existingId) {
+      const updated = await api.updateProduct(existingId, payload);
+      setWorkspace((prev) => ({
+        ...prev,
+        products: prev.products.map((p) => (p.id === updated.id ? updated : p)),
+      }));
+      showToast('Product updated.');
+      return;
+    }
+    const created = await api.createProduct(payload);
+    setWorkspace((prev) => ({
+      ...prev,
+      products: [created, ...prev.products],
+    }));
+    showToast('Product added to catalog.');
   };
 
-  const handleDuplicateSaved = (saved: SavedInvoice) => {
-    const { grandTotal: _gt, ...rest } = saved;
-    const nextNo = incrementInvoiceNumber(saved.meta.invoiceNo);
-    setInvoice({
-      ...rest,
-      id: `inv-${Date.now()}`,
-      meta: {
-        ...rest.meta,
-        invoiceNo: nextNo,
-      },
-      updatedAt: new Date().toISOString(),
-    });
-    setActiveTab('builder');
+  const handleDeleteProduct = async (id: string) => {
+    await api.deleteProduct(id);
+    setWorkspace((prev) => ({
+      ...prev,
+      products: prev.products.filter((p) => p.id !== id),
+    }));
+    showToast('Product removed.');
   };
 
-  const handleDeleteSaved = (id: string) => {
-    setSavedInvoices((prev) => prev.filter((item) => item.id !== id));
+  const handleSaveInvoice = async (
+    payload: Partial<Invoice>,
+    existingId?: string
+  ): Promise<Invoice> => {
+    if (existingId) {
+      const res = await api.updateInvoice(existingId, payload);
+      setWorkspace((prev) => ({
+        ...prev,
+        invoices: prev.invoices.map((i) =>
+          i.id === res.invoice.id ? res.invoice : i
+        ),
+        products: res.products,
+        payments: res.payments,
+      }));
+      showToast(`Invoice ${res.invoice.invoiceNumber} updated.`);
+      return res.invoice;
+    }
+
+    const res = await api.createInvoice(payload);
+    setWorkspace((prev) => ({
+      ...prev,
+      invoices: [res.invoice, ...prev.invoices],
+      products: res.products,
+      payments: res.payment ? [res.payment, ...prev.payments] : prev.payments,
+    }));
+    showToast(`Invoice ${res.invoice.invoiceNumber} saved.`);
+    return res.invoice;
   };
 
-  const activeScale = zoomMode === 'fit' ? fitScale : zoomMode;
+  const handleDeleteInvoice = async (id: string) => {
+    const res = await api.deleteInvoice(id);
+    setWorkspace((prev) => ({
+      ...prev,
+      invoices: prev.invoices.filter((i) => i.id !== id),
+      payments: prev.payments.filter((p) => p.invoiceId !== id),
+      products: res.products,
+    }));
+    showToast('Invoice deleted and stock restored.');
+  };
+
+  const handleRecordPayment = async (payload: {
+    invoiceId: string;
+    amountPaid: number;
+    paymentDate: string;
+    paymentMethod: PaymentMethod;
+    note: string;
+  }) => {
+    const res = await api.createPayment(payload);
+    setWorkspace((prev) => ({
+      ...prev,
+      payments: [res.payment, ...prev.payments],
+      invoices: prev.invoices.map((i) =>
+        i.id === res.invoice.id ? res.invoice : i
+      ),
+    }));
+    showToast('Payment recorded.');
+  };
+
+  const handleDeletePayment = async (id: string) => {
+    const res = await api.deletePayment(id);
+    setWorkspace((prev) => ({
+      ...prev,
+      payments: prev.payments.filter((p) => p.id !== id),
+      invoices: res.invoice
+        ? prev.invoices.map((i) => (i.id === res.invoice!.id ? res.invoice! : i))
+        : prev.invoices,
+    }));
+    showToast('Payment entry removed.');
+  };
+
+  const handleUpdateDelivery = async (
+    invoiceId: string,
+    payload: {
+      courierName: string;
+      trackingNumber: string;
+      deliveryStatus: DeliveryStatus;
+    }
+  ) => {
+    const updated = await api.updateDelivery(invoiceId, payload);
+    setWorkspace((prev) => ({
+      ...prev,
+      invoices: prev.invoices.map((i) => (i.id === updated.id ? updated : i)),
+    }));
+    showToast(`Delivery status set to ${updated.deliveryStatus}.`);
+  };
+
+  const handleAddExpense = async (
+    payload: Omit<ExpenseRecord, 'id' | 'createdAt'>
+  ) => {
+    const created = await api.createExpense(payload);
+    setWorkspace((prev) => ({
+      ...prev,
+      expenses: [created, ...prev.expenses],
+    }));
+    showToast('Expense added.');
+  };
+
+  const handleDeleteExpense = async (id: string) => {
+    await api.deleteExpense(id);
+    setWorkspace((prev) => ({
+      ...prev,
+      expenses: prev.expenses.filter((e) => e.id !== id),
+    }));
+    showToast('Expense deleted.');
+  };
+
+  const handleSaveSettings = async (next: BusinessSettings) => {
+    const saved = await api.updateSettings(next);
+    setWorkspace((prev) => ({ ...prev, settings: saved }));
+    showToast('Settings saved.');
+  };
+
+  const handleRestoreBackup = async (backup: WorkspaceData) => {
+    const restored = await api.restoreBackup(backup);
+    setWorkspace(restored);
+    showToast('Backup restored successfully.');
+  };
+
+  if (authChecking) {
+    return (
+      <div className="min-h-screen bg-[#FDF9FC] flex items-center justify-center">
+        <div className="text-sm font-semibold text-[#7E22CE]">
+          Loading Glamour Galleria...
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <AuthView
+        onAuthenticated={(authUser, authWorkspace) => {
+          setUser(authUser);
+          setWorkspace(authWorkspace);
+          setRoute('dashboard');
+          setHistory([]);
+        }}
+      />
+    );
+  }
+
+  const currencySymbol = workspace.settings.currencySymbol || '₹';
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#F6F4EF] text-[#181613]">
+    <div className="min-h-screen flex flex-col bg-[#FDF9FC] text-[#1F122B]">
       {/* TOP NAVIGATION BAR (Strict 3-zone contract) */}
-      <header className="no-print sticky top-0 z-30 bg-[#FFFFFF]/95 backdrop-blur-xs border-b border-[#E4DFD4]">
-        <div className="max-w-[1480px] mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-8">
-          {/* Zone 1: Single-line brand wordmark */}
+      <header className="no-print sticky top-0 z-30 bg-white/95 backdrop-blur-xs border-b border-[#EFE2F5]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-8">
+          {/* Zone 1: Brand Wordmark */}
           <button
             type="button"
-            onClick={() => setActiveTab('builder')}
-            className="font-display-serif text-lg font-bold tracking-tight text-[#181613] whitespace-nowrap shrink-0 cursor-pointer"
+            onClick={() => navigateTo('dashboard')}
+            className="font-display-serif text-lg font-bold tracking-tight text-[#6D28D9] whitespace-nowrap shrink-0 cursor-pointer"
           >
-            Glamour Galleria
+            {workspace.settings.businessName || 'Glamour Galleria'}
           </button>
 
-          {/* Zone 2: Clean single-line text nav links */}
-          <nav className="flex items-center gap-6 overflow-x-auto">
+          {/* Zone 2: 5 concise single-line nav links */}
+          <nav className="hidden md:flex items-center gap-6 overflow-x-auto">
             {(
               [
-                { id: 'builder', label: t.navBuilder },
-                { id: 'saved', label: `${t.navSaved} (${savedInvoices.length})` },
-                { id: 'settings', label: t.navSettings },
+                { id: 'dashboard', label: 'Dashboard' },
+                { id: 'client-list', label: 'Clients' },
+                { id: 'products', label: 'Products' },
+                { id: 'sales-report', label: 'Reports' },
+                { id: 'settings', label: 'Settings' },
               ] as const
-            ).map((item) => {
-              const isActive = activeTab === item.id;
+            ).map((nav) => {
+              const active = route === nav.id;
               return (
                 <button
-                  key={item.id}
+                  key={nav.id}
                   type="button"
-                  onClick={() => setActiveTab(item.id)}
-                  className={`py-1 text-sm font-medium transition-colors whitespace-nowrap shrink-0 border-b-2 cursor-pointer ${
-                    isActive
-                      ? 'text-[#181613] border-[#B8913D]'
-                      : 'text-[#6B6356] border-transparent hover:text-[#181613]'
+                  onClick={() => navigateTo(nav.id)}
+                  className={`py-1 text-sm font-semibold transition-colors whitespace-nowrap shrink-0 border-b-2 cursor-pointer ${
+                    active
+                      ? 'text-[#DB2777] border-[#DB2777]'
+                      : 'text-[#5B4B6B] border-transparent hover:text-[#7E22CE]'
                   }`}
                 >
-                  {item.label}
+                  {nav.label}
                 </button>
               );
             })}
           </nav>
 
-          {/* Zone 3: Single primary action button */}
+          {/* Zone 3: Primary CTA */}
           <div className="shrink-0">
             <button
               type="button"
-              onClick={handleDownloadPdf}
-              disabled={isExporting}
-              className="inline-flex items-center gap-2 rounded-md bg-[#181613] px-4 py-2 text-xs font-semibold text-[#F5EFE4] hover:bg-[#2E2923] disabled:opacity-60 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              onClick={() => navigateTo('client-bill')}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#DB2777] to-[#7E22CE] px-4 py-2 text-xs font-semibold text-white hover:opacity-95 transition-opacity whitespace-nowrap shrink-0 cursor-pointer"
             >
-              <Download className="w-3.5 h-3.5 text-[#D5AE52]" />
-              <span>{isExporting ? t.downloadingPdf : t.downloadPdf}</span>
+              <FilePlus2 className="w-3.5 h-3.5" />
+              <span>New Bill</span>
             </button>
           </div>
         </div>
       </header>
 
-      {/* WORKSPACE TOOLBAR (Builder view) */}
-      {activeTab === 'builder' && (
-        <div className="no-print border-b border-[#E5E0D5] bg-[#FAF8F4]">
-          <div className="max-w-[1480px] mx-auto px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={handleNewBill}
-                className="inline-flex items-center gap-1.5 rounded-md border border-[#DDD7CB] bg-white px-3 py-1.5 text-xs font-medium text-[#181613] hover:bg-[#F3EFE6] whitespace-nowrap shrink-0 cursor-pointer"
-              >
-                <FilePlus2 className="w-3.5 h-3.5 text-[#7D6635]" />
-                <span>{t.newBill}</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveBill}
-                className="inline-flex items-center gap-1.5 rounded-md border border-[#DDD7CB] bg-white px-3 py-1.5 text-xs font-medium text-[#181613] hover:bg-[#F3EFE6] whitespace-nowrap shrink-0 cursor-pointer"
-              >
-                <BookmarkCheck className="w-3.5 h-3.5 text-[#7D6635]" />
-                <span>{t.saveBill}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => window.print()}
-                className="inline-flex items-center gap-1.5 rounded-md border border-[#DDD7CB] bg-white px-3 py-1.5 text-xs font-medium text-[#181613] hover:bg-[#F3EFE6] whitespace-nowrap shrink-0 cursor-pointer"
-              >
-                <Printer className="w-3.5 h-3.5 text-[#7D6635]" />
-                <span>{t.printBill}</span>
-              </button>
-            </div>
-
-            <div className="flex items-center gap-4">
-              {/* Language Switcher */}
-              <div className="flex items-center gap-1 p-0.5 rounded-md bg-[#EAE5DA]">
-                <button
-                  type="button"
-                  onClick={() => setLang('en')}
-                  className={`px-2.5 py-1 text-xs font-medium rounded-xs transition-colors whitespace-nowrap cursor-pointer ${
-                    lang === 'en' ? 'bg-white text-[#181613] shadow-xs' : 'text-[#5A5347]'
-                  }`}
-                >
-                  EN
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setLang('bn')}
-                  className={`px-2.5 py-1 text-xs font-medium rounded-xs transition-colors whitespace-nowrap cursor-pointer ${
-                    lang === 'bn' ? 'bg-white text-[#181613] shadow-xs' : 'text-[#5A5347]'
-                  }`}
-                >
-                  বাংলা
-                </button>
-              </div>
-
-              {/* Preview Zoom Controls */}
-              <div className="hidden md:flex items-center gap-1 p-0.5 rounded-md bg-[#EAE5DA]">
-                {(
-                  [
-                    { id: 'fit', label: t.zoomFit },
-                    { id: 0.75, label: '75%' },
-                    { id: 1, label: '100%' },
-                  ] as const
-                ).map((z) => (
-                  <button
-                    key={String(z.id)}
-                    type="button"
-                    onClick={() => setZoomMode(z.id)}
-                    className={`px-2.5 py-1 text-xs font-medium rounded-xs transition-colors whitespace-nowrap cursor-pointer ${
-                      zoomMode === z.id ? 'bg-white text-[#181613] shadow-xs' : 'text-[#5A5347]'
-                    }`}
-                  >
-                    {z.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MAIN CONTENT AREA */}
+      {/* ACTIVE VIEW */}
       <main className="flex-1">
-        {activeTab === 'builder' && (
-          <div className="max-w-[1480px] mx-auto grid grid-cols-1 lg:grid-cols-[480px_1fr] xl:grid-cols-[520px_1fr] min-h-[calc(100vh-105px)]">
-            {/* Left Studio Editor */}
-            <div className="no-print bg-[#FAF8F4] border-r border-[#E4DFD4] px-4 sm:px-6 py-6 overflow-y-auto">
-              <InvoiceForm invoice={invoice} onChange={setInvoice} t={t} />
-            </div>
-
-            {/* Right Live A4 Preview Stage */}
-            <div
-              ref={previewStageRef}
-              className="bg-[#E9E4DA] px-4 py-6 sm:py-8 flex flex-col items-center overflow-x-auto"
-            >
-              <div className="no-print w-full max-w-[794px] flex items-center justify-between text-xs text-[#6B6356] mb-3 px-1">
-                <span>{t.previewLabel}</span>
-                <span className="font-mono-num">A4 · 210 × 297 mm</span>
-              </div>
-
-              <div
-                style={{
-                  width: `${794 * activeScale}px`,
-                  height: `${1123 * activeScale}px`,
-                  position: 'relative',
-                }}
-              >
-                <div
-                  style={{
-                    transform: `scale(${activeScale})`,
-                    transformOrigin: 'top left',
-                    width: '794px',
-                    boxShadow: '0 20px 50px -15px rgba(20, 18, 16, 0.35)',
-                  }}
-                >
-                  <InvoicePreview
-                    invoice={invoice}
-                    settings={settings}
-                    previewRef={invoiceSheetRef}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'saved' && (
-          <SavedBillsView
-            savedInvoices={savedInvoices}
-            onLoadInvoice={handleLoadSaved}
-            onDuplicateInvoice={handleDuplicateSaved}
-            onDeleteInvoice={handleDeleteSaved}
-            onDownloadSavedPdf={handleDownloadSavedPdf}
-            onCreateNew={handleNewBill}
-            t={t}
+        {route === 'dashboard' && (
+          <DashboardView
+            workspace={workspace}
+            onNavigate={(nextRoute) => navigateTo(nextRoute)}
           />
         )}
 
-        {activeTab === 'settings' && (
-          <StoreSettingsView
-            settings={settings}
-            onSaveSettings={(next) => setSettings(next)}
-            t={t}
+        {route === 'new-client' && (
+          <NewClientView
+            editingClient={editingClient}
+            onBack={goBack}
+            onSaveClient={handleSaveClient}
+          />
+        )}
+
+        {route === 'client-list' && (
+          <ClientListView
+            clients={workspace.clients}
+            invoices={workspace.invoices}
+            currencySymbol={currencySymbol}
+            selectedClientId={selectedClientId}
+            onSelectClient={(id) => navigateTo('client-list', { clientId: id })}
+            onBack={goBack}
+            onAddNew={() => navigateTo('new-client', { editClient: null })}
+            onEditClient={(client) =>
+              navigateTo('new-client', { editClient: client })
+            }
+            onDeleteClient={handleDeleteClient}
+            onCreateBillForClient={(client) =>
+              navigateTo('client-bill', {
+                forBillClientId: client.id,
+                editInvoice: null,
+              })
+            }
+            onOpenInvoice={(inv) =>
+              navigateTo('client-bill', { editInvoice: inv })
+            }
+          />
+        )}
+
+        {route === 'client-bill' && (
+          <ClientBillView
+            settings={workspace.settings}
+            clients={workspace.clients}
+            products={workspace.products}
+            invoices={workspace.invoices}
+            initialClientId={billClientId}
+            editingInvoice={editingInvoice}
+            onBack={goBack}
+            onAddNewClient={() => navigateTo('new-client', { editClient: null })}
+            onSaveInvoice={handleSaveInvoice}
+            onDeleteInvoice={handleDeleteInvoice}
+          />
+        )}
+
+        {route === 'products' && (
+          <ProductsView
+            products={workspace.products}
+            currencySymbol={currencySymbol}
+            defaultLowStock={workspace.settings.lowStockThreshold || 5}
+            onBack={goBack}
+            onSaveProduct={handleSaveProduct}
+            onDeleteProduct={handleDeleteProduct}
+          />
+        )}
+
+        {route === 'sales-report' && (
+          <SalesReportView
+            invoices={workspace.invoices}
+            currencySymbol={currencySymbol}
+            onBack={goBack}
+          />
+        )}
+
+        {route === 'payment-history' && (
+          <PaymentHistoryView
+            invoices={workspace.invoices}
+            payments={workspace.payments}
+            currencySymbol={currencySymbol}
+            onBack={goBack}
+            onRecordPayment={handleRecordPayment}
+            onDeletePayment={handleDeletePayment}
+          />
+        )}
+
+        {route === 'delivery-tracking' && (
+          <DeliveryTrackingView
+            invoices={workspace.invoices}
+            onBack={goBack}
+            onUpdateDelivery={handleUpdateDelivery}
+          />
+        )}
+
+        {route === 'profit-loss' && (
+          <ProfitLossView
+            invoices={workspace.invoices}
+            expenses={workspace.expenses}
+            currencySymbol={currencySymbol}
+            onBack={goBack}
+            onAddExpense={handleAddExpense}
+            onDeleteExpense={handleDeleteExpense}
+          />
+        )}
+
+        {route === 'settings' && (
+          <SettingsView
+            user={user}
+            workspace={workspace}
+            onBack={goBack}
+            onSaveSettings={handleSaveSettings}
+            onRestoreBackup={handleRestoreBackup}
+            onSignOut={handleSignOut}
           />
         )}
       </main>
 
-      {/* Offscreen hidden render container for Saved Bills direct PDF export */}
-      {pdfRenderTarget && (
-        <div
-          aria-hidden="true"
-          style={{ position: 'fixed', left: '-12000px', top: 0, width: '794px', pointerEvents: 'none' }}
-        >
-          <InvoicePreview
-            invoice={pdfRenderTarget}
-            settings={settings}
-            previewRef={hiddenExportRef}
-          />
-        </div>
-      )}
+      {/* MOBILE BOTTOM NAVIGATION DOCK (Compact h-14, <= 15% combined sticky height) */}
+      <nav className="no-print md:hidden fixed bottom-0 left-0 right-0 z-30 h-14 bg-white/95 backdrop-blur-md border-t border-[#EFE2F5] grid grid-cols-4 items-center px-2">
+        {(
+          [
+            { id: 'dashboard', label: 'Home', icon: Home },
+            { id: 'client-list', label: 'Clients', icon: Users },
+            { id: 'products', label: 'Products', icon: Package },
+            { id: 'settings', label: 'Settings', icon: Settings },
+          ] as const
+        ).map((tab) => {
+          const Icon = tab.icon;
+          const active = route === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => navigateTo(tab.id)}
+              className={`flex flex-col items-center justify-center py-1 text-[10px] font-semibold cursor-pointer ${
+                active ? 'text-[#DB2777]' : 'text-[#6B5B7B]'
+              }`}
+            >
+              <Icon className="w-4 h-4 mb-0.5" />
+              <span>{tab.label}</span>
+            </button>
+          );
+        })}
+      </nav>
 
-      {/* Subtle Toast Notification */}
-      {toastMsg && (
-        <div className="no-print fixed bottom-5 right-5 z-50 rounded-md bg-[#181613] text-[#F5EFE4] px-4 py-2.5 text-xs font-medium shadow-lg border border-[#6E582B]">
-          {toastMsg}
+      {/* Toast Notification */}
+      {toast && (
+        <div className="no-print fixed bottom-16 md:bottom-5 right-4 z-50 rounded-xl bg-[#1F122B] text-white px-4 py-2.5 text-xs font-semibold shadow-lg border border-[#A855F7]/40">
+          {toast}
         </div>
       )}
     </div>

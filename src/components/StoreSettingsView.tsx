@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { RotateCcw, Upload, X } from 'lucide-react';
+import { ArrowLeft, RotateCcw, Upload, X } from 'lucide-react';
 import { COURIER_PRESETS, DEFAULT_STORE_SETTINGS } from '../data/defaults';
 import { Translations } from '../i18n/translations';
 import { StoreSettings } from '../types/invoice';
@@ -7,12 +7,14 @@ import { GoldCrestLogo } from './GoldCrestLogo';
 
 interface StoreSettingsViewProps {
   settings: StoreSettings;
+  onBack: () => void;
   onSaveSettings: (next: StoreSettings) => void;
   t: Translations;
 }
 
 export const StoreSettingsView: React.FC<StoreSettingsViewProps> = ({
   settings,
+  onBack,
   onSaveSettings,
   t,
 }) => {
@@ -55,11 +57,21 @@ export const StoreSettingsView: React.FC<StoreSettingsViewProps> = ({
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-        <div>
-          <h1 className="font-display-serif text-2xl font-bold text-[#181613]">
-            {t.settingsTitle}
-          </h1>
-          <p className="text-sm text-[#6B6356] mt-1">{t.settingsSubtitle}</p>
+        <div className="flex items-start gap-3">
+          <button
+            type="button"
+            onClick={onBack}
+            className="mt-0.5 inline-flex items-center gap-1.5 rounded-md border border-[#DDD7CB] bg-white px-3 py-1.5 text-xs font-medium text-[#181613] hover:bg-[#F3EFE6] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+          >
+            <ArrowLeft className="w-3.5 h-3.5 text-[#7D6635]" />
+            <span>{t.backBtn}</span>
+          </button>
+          <div>
+            <h1 className="font-display-serif text-2xl font-bold text-[#181613]">
+              {t.settingsTitle}
+            </h1>
+            <p className="text-sm text-[#6B6356] mt-1">{t.settingsSubtitle}</p>
+          </div>
         </div>
 
         <div className="flex items-center gap-3">

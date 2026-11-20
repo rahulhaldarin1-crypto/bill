@@ -6,7 +6,7 @@ export interface OrderItem {
   id: string;
   productName: string;
   size: string;
-  qty: number;
+  qty: number | '';
   originalPrice: number | '';
   discountedPrice: number | '';
 }
@@ -16,6 +16,13 @@ export interface CustomerDetails {
   phone: string;
   address: string;
   cityPin: string;
+}
+
+export interface ClientRecord extends CustomerDetails {
+  id: string;
+  clientCode?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface InvoiceMeta {
@@ -34,12 +41,13 @@ export interface ShipmentDetails {
 
 export interface InvoiceData {
   id: string;
+  clientId?: string;
   customer: CustomerDetails;
   meta: InvoiceMeta;
   items: OrderItem[];
   shipment: ShipmentDetails;
-  deliveryCharge: number;
-  gstPercent: number;
+  deliveryCharge: number | '';
+  gstPercent: number | '';
   paymentMethod: PaymentMethod;
   codAmountOverride: number | '';
   updatedAt: string;
