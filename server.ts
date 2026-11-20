@@ -383,36 +383,28 @@ async function startServer(): Promise<void> {
     res.json({ status: 'ok', app: 'Glamour Galleria' });
   });
 
-  // AUTH ROUTES (Owner Login + One-Time First-Run Claim when no Secrets/DB owner exists)
-  app.get('/api/auth/status', (_req: Request, res: Response) => {
-    const envEmail = (process.env.ADMIN_EMAIL || '').trim().toLowerCase();
-    const envPassword = process.env.ADMIN_PASSWORD || '';
-    const ownerConfigured = Boolean(
-      dbState.users.length > 0 || (envEmail && envPassword)
-    );
-    res.json({ ownerConfigured });
-  });
-
-  app.post('/api/auth/claim-owner', async (req: Request, res: Response) => {
-    const envEmail = (process.env.ADMIN_EMAIL || '').trim().toLowerCase();
-    const envPassword = process.env.ADMIN_PASSWORD || '';
-    if (dbState.users.length > 0 || (envEmail && envPassword)) {
-      res.status(403).json({
-        error: 'Owner account is already configured. Please sign in.',
-      });
-      return;
-    }
-
+  // AUTH ROUTES (Sign In & Create Account)
+  app.post('/api/auth/register', async (req: Request, res: Response) => {
+    const name = String(req.body?.name || '').trim();
     const email = String(req.body?.email || '').trim().toLowerCase();
     const password = String(req.body?.password || '');
-    const name = String(req.body?.name || 'Glamour Galleria Owner').trim() || 'Owner';
 
+    if (!name || name.length < 2) {
+      res.status(400).json({ error: 'Please enter your full name (at least 2 characters).' });
+      return;
+    }
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       res.status(400).json({ error: 'Please enter a valid email address.' });
       return;
     }
     if (password.length < 6) {
       res.status(400).json({ error: 'Password must be at least 6 characters long.' });
+      return;
+    }
+
+    const exists = dbState.users.find((u) => u.email === email);
+    if (exists) {
+      res.status(409).json({ error: 'An account with this email already exists. Please sign in.' });
       return;
     }
 
@@ -435,12 +427,6 @@ async function startServer(): Promise<void> {
       token,
       user: { id: user.id, name: user.name, email: user.email, createdAt: user.createdAt },
       workspace,
-    });
-  });
-
-  app.post('/api/auth/register', (_req: Request, res: Response) => {
-    res.status(403).json({
-      error: 'Account registration is disabled. Please sign in with the owner account.',
     });
   });
 

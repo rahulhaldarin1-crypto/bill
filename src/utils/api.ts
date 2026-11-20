@@ -55,16 +55,12 @@ async function request<T>(
 }
 
 export const api = {
-  async authStatus() {
-    return request<{ ownerConfigured: boolean }>('/api/auth/status');
-  },
-
-  async claimOwner(payload: { email: string; password: string }) {
+  async register(payload: { name: string; email: string; password: string }) {
     const data = await request<{
       token: string;
       user: UserAccount;
       workspace: WorkspaceData;
-    }>('/api/auth/claim-owner', {
+    }>('/api/auth/register', {
       method: 'POST',
       body: JSON.stringify(payload),
     });
