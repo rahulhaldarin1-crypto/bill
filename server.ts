@@ -190,12 +190,18 @@ let writeChain: Promise<void> = Promise.resolve();
 
 function persistDatabase(): Promise<void> {
   const snapshot = JSON.stringify(dbState, null, 2);
-  writeChain = writeChain.then(async () => {
-    ensureDataDir();
-    const tmp = `${DB_FILE}.${Date.now()}.tmp`;
-    await fs.promises.writeFile(tmp, snapshot, 'utf8');
-    await fs.promises.rename(tmp, DB_FILE);
-  });
+  writeChain = writeChain
+    .catch(() => undefined)
+    .then(async () => {
+      try {
+        ensureDataDir();
+        const tmp = `${DB_FILE}.${Date.now()}.tmp`;
+        await fs.promises.writeFile(tmp, snapshot, 'utf8');
+        await fs.promises.rename(tmp, DB_FILE);
+      } catch (err) {
+        console.error('Database write warning:', err);
+      }
+    });
   return writeChain;
 }
 

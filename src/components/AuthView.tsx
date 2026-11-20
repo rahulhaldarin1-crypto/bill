@@ -25,6 +25,12 @@ export const AuthView: React.FC<AuthViewProps> = ({
     e.preventDefault();
     setError('');
 
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      setError('Please enter a valid email address.');
+      return;
+    }
+
     if (mode === 'register') {
       if (name.trim().length < 2) {
         setError('Please enter your full name (at least 2 characters).');
@@ -35,17 +41,24 @@ export const AuthView: React.FC<AuthViewProps> = ({
         return;
       }
       if (password !== confirmPassword) {
-        setError('Passwords do not match.');
+        setError('Password and Confirm Password do not match.');
         return;
       }
+    } else if (!password) {
+      setError('Please enter your password.');
+      return;
     }
 
     setLoading(true);
     try {
       const result =
         mode === 'register'
-          ? await api.register({ name: name.trim(), email: email.trim(), password })
-          : await api.login({ email: email.trim(), password });
+          ? await api.register({
+              name: name.trim(),
+              email: trimmedEmail,
+              password,
+            })
+          : await api.login({ email: trimmedEmail, password });
       onAuthenticated(result.user, result.workspace);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Authentication failed.');
@@ -99,12 +112,24 @@ export const AuthView: React.FC<AuthViewProps> = ({
       </div>
 
       {error && (
-        <div className="mb-4 rounded-xl border border-[#FECDD3] bg-[#FFF1F2] px-3.5 py-2.5 text-xs font-medium text-[#BE123C]">
-          {error}
+        <div className="mb-4 rounded-xl border border-[#FECDD3] bg-[#FFF1F2] px-3.5 py-2.5 text-xs font-medium text-[#BE123C] space-y-1">
+          <div>{error}</div>
+          {mode === 'register' && error.toLowerCase().includes('already exists') && (
+            <button
+              type="button"
+              onClick={() => {
+                setMode('login');
+                setError('');
+              }}
+              className="font-bold text-[#7E22CE] underline cursor-pointer"
+            >
+              Switch to Sign In now
+            </button>
+          )}
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} noValidate className="space-y-4">
         {mode === 'register' && (
           <div>
             <label className="block text-xs font-semibold text-[#4A3B59] mb-1.5">
@@ -114,7 +139,6 @@ export const AuthView: React.FC<AuthViewProps> = ({
               <User className="w-4 h-4 text-[#9333EA] shrink-0" />
               <input
                 type="text"
-                required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Enter your name"
@@ -132,7 +156,6 @@ export const AuthView: React.FC<AuthViewProps> = ({
             <Mail className="w-4 h-4 text-[#9333EA] shrink-0" />
             <input
               type="email"
-              required
               autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -150,7 +173,6 @@ export const AuthView: React.FC<AuthViewProps> = ({
             <Lock className="w-4 h-4 text-[#9333EA] shrink-0" />
             <input
               type="password"
-              required
               autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -169,7 +191,6 @@ export const AuthView: React.FC<AuthViewProps> = ({
               <ShieldCheck className="w-4 h-4 text-[#9333EA] shrink-0" />
               <input
                 type="password"
-                required
                 autoComplete="new-password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
