@@ -292,6 +292,7 @@ export const InvoiceForm: React.FC<InvoiceFormProps> = ({ invoice, onChange, t }
               onChange={(e) => updateMeta('orderVia', e.target.value)}
               className={inputClass}
             >
+              <option value="">Select...</option>
               {ORDER_VIA_CHOICES.map((ch) => (
                 <option key={ch} value={ch}>
                   {ch}

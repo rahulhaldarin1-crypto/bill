@@ -49,6 +49,9 @@ export function formatMoney(val: number): string {
 }
 
 export function incrementInvoiceNumber(current: string): string {
+  if (!current || !current.trim()) {
+    return 'GG-001';
+  }
   // Matches trailing numbers like GG-875/GG-876 -> GG-877/GG-878 or GG-876 -> GG-877
   const slashMatch = current.match(/^(.*?)(\d+)\s*\/\s*(.*?)(\d+)$/);
   if (slashMatch) {

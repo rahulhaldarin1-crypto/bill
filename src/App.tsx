@@ -23,8 +23,8 @@ type ZoomMode = 'fit' | 0.75 | 1;
 
 const STORAGE_KEYS = {
   SETTINGS: 'gg_invoice_store_settings_v1',
-  SAVED_BILLS: 'gg_invoice_saved_bills_v1',
-  DRAFT: 'gg_invoice_current_draft_v1',
+  SAVED_BILLS: 'gg_invoice_saved_bills_v2',
+  DRAFT: 'gg_invoice_current_draft_v2',
   LANG: 'gg_invoice_ui_lang_v1',
 };
 
@@ -45,8 +45,7 @@ function loadInitialSavedBills(): SavedInvoice[] {
   } catch {
     // ignore storage errors
   }
-  const totals = calculateTotals(INITIAL_SAMPLE_INVOICE);
-  return [{ ...INITIAL_SAMPLE_INVOICE, grandTotal: totals.grandTotal }];
+  return [];
 }
 
 function loadInitialDraft(): InvoiceData {
@@ -168,8 +167,8 @@ export default function App() {
   };
 
   const handleNewBill = () => {
-    const latestInvNo = savedInvoices[0]?.meta.invoiceNo || invoice.meta.invoiceNo || 'GG-875';
-    const nextInvNo = incrementInvoiceNumber(latestInvNo);
+    const latestInvNo = savedInvoices[0]?.meta.invoiceNo || invoice.meta.invoiceNo;
+    const nextInvNo = latestInvNo ? incrementInvoiceNumber(latestInvNo) : '';
     setInvoice(createBlankInvoice(nextInvNo, settings));
     setActiveTab('builder');
   };

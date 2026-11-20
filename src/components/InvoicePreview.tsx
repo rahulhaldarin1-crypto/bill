@@ -185,23 +185,23 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
             </div>
             <div style={{ marginBottom: '3px' }}>
               <span style={{ fontWeight: 700, color: '#F5EFE4' }}>Name: </span>
-              <span style={{ color: '#F5EFE4' }}>{invoice.customer.name || '—'}</span>
+              <span style={{ color: '#F5EFE4' }}>{invoice.customer.name}</span>
             </div>
             <div style={{ marginBottom: '3px' }}>
               <span style={{ fontWeight: 700, color: '#F5EFE4' }}>Phone: </span>
               <span className="font-mono-num" style={{ color: '#F5EFE4', fontSize: '11px' }}>
-                {invoice.customer.phone || '—'}
+                {invoice.customer.phone}
               </span>
             </div>
             <div style={{ marginBottom: '3px' }}>
               <span style={{ fontWeight: 700, color: '#F5EFE4' }}>Address: </span>
               <span style={{ color: '#E8DFCF', wordBreak: 'break-word' }}>
-                {invoice.customer.address || '—'}
+                {invoice.customer.address}
               </span>
             </div>
             <div>
               <span style={{ fontWeight: 700, color: '#F5EFE4' }}>City / PIN: </span>
-              <span style={{ color: '#F5EFE4' }}>{invoice.customer.cityPin || '—'}</span>
+              <span style={{ color: '#F5EFE4' }}>{invoice.customer.cityPin}</span>
             </div>
           </div>
 
@@ -228,31 +228,29 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
             <div style={{ marginBottom: '2px' }}>
               <span style={{ fontWeight: 700, color: '#F5EFE4' }}>Invoice No: </span>
               <span className="font-mono-num" style={{ color: '#D4AF56' }}>
-                {invoice.meta.invoiceNo || '—'}
+                {invoice.meta.invoiceNo}
               </span>
             </div>
             <div style={{ marginBottom: '2px' }}>
               <span style={{ fontWeight: 700, color: '#F5EFE4' }}>Order Date: </span>
               <span className="font-mono-num" style={{ color: '#D4AF56' }}>
-                {invoice.meta.orderDate ? `[${invoice.meta.orderDate}]` : '—'}
+                {invoice.meta.orderDate}
               </span>
             </div>
             <div style={{ marginBottom: '2px' }}>
               <span style={{ fontWeight: 700, color: '#F5EFE4' }}>Delivery Date: </span>
               <span className="font-mono-num" style={{ color: '#D4AF56' }}>
-                {invoice.meta.deliveryDate ? `[${invoice.meta.deliveryDate}]` : '[Pending]'}
+                {invoice.meta.deliveryDate}
               </span>
             </div>
             <div style={{ marginBottom: '2px' }}>
               <span style={{ fontWeight: 700, color: '#F5EFE4' }}>Order via: </span>
-              <span style={{ color: '#D4AF56' }}>
-                {invoice.meta.orderVia ? `[${invoice.meta.orderVia}]` : '—'}
-              </span>
+              <span style={{ color: '#D4AF56' }}>{invoice.meta.orderVia}</span>
             </div>
             <div>
               <span style={{ fontWeight: 700, color: '#F5EFE4' }}>Payment: </span>
               <span style={{ color: '#D4AF56' }}>
-                {invoice.meta.paymentLabel ? `[${invoice.meta.paymentLabel}]` : `[${invoice.paymentMethod}]`}
+                {invoice.meta.paymentLabel || invoice.paymentMethod}
               </span>
             </div>
           </div>
@@ -538,7 +536,7 @@ export const InvoicePreview: React.FC<InvoicePreviewProps> = ({
             <div>
               <span style={{ fontWeight: 700, color: '#F5EFE4' }}>Tracking ID / AWB No: </span>
               <span className="font-mono-num" style={{ color: '#D4AF56' }}>
-                {invoice.shipment.trackingId || '[Pending dispatch]'}
+                {invoice.shipment.trackingId}
               </span>
             </div>
             <div style={{ marginTop: '4px' }}>

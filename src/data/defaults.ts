@@ -87,37 +87,28 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
 };
 
 export const INITIAL_SAMPLE_INVOICE: InvoiceData = {
-  id: 'inv-sample-875',
+  id: 'inv-initial-blank',
   customer: {
-    name: 'Anil Barman',
-    phone: '+916000294107',
-    address:
-      'Biswakarma battery solution and regenerators Near Chandra Choudhury Path Borsojai Jatiya Vidyalaya, Guwahati,',
-    cityPin: 'Assam-781028',
+    name: '',
+    phone: '',
+    address: '',
+    cityPin: '',
   },
   meta: {
-    invoiceNo: 'GG-875/GG-876',
-    orderDate: '20 / 11 / 26',
-    deliveryDate: '29 / 11 / 26 (01/12/26)',
-    orderVia: 'WhatsApp',
-    paymentLabel: 'COD',
+    invoiceNo: '',
+    orderDate: '',
+    deliveryDate: '',
+    orderVia: '',
+    paymentLabel: '',
   },
   items: [
     {
-      id: 'item-1',
-      productName: 'Partywear Grey Fur Collar Neck Sweaters For Womens & Girls.',
+      id: 'item-initial-1',
+      productName: '',
       size: 'M',
       qty: 1,
       originalPrice: '',
-      discountedPrice: 570,
-    },
-    {
-      id: 'item-2',
-      productName: 'Pretty Retro Women Sweaters',
-      size: 'M',
-      qty: 1,
-      originalPrice: '',
-      discountedPrice: 575,
+      discountedPrice: '',
     },
   ],
   shipment: {
@@ -133,25 +124,20 @@ export const INITIAL_SAMPLE_INVOICE: InvoiceData = {
 };
 
 export function createBlankInvoice(nextInvoiceNo: string, settings: StoreSettings): InvoiceData {
-  const now = new Date();
-  const dd = String(now.getDate()).padStart(2, '0');
-  const mm = String(now.getMonth() + 1).padStart(2, '0');
-  const yy = String(now.getFullYear()).slice(-2);
-
   return {
     id: `inv-${Date.now()}`,
     customer: {
       name: '',
-      phone: '+91',
+      phone: '',
       address: '',
       cityPin: '',
     },
     meta: {
       invoiceNo: nextInvoiceNo,
-      orderDate: `${dd} / ${mm} / ${yy}`,
+      orderDate: '',
       deliveryDate: '',
-      orderVia: 'WhatsApp',
-      paymentLabel: 'COD',
+      orderVia: '',
+      paymentLabel: '',
     },
     items: [
       {
