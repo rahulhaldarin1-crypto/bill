@@ -55,6 +55,23 @@ async function request<T>(
 }
 
 export const api = {
+  async authStatus() {
+    return request<{ ownerConfigured: boolean }>('/api/auth/status');
+  },
+
+  async claimOwner(payload: { email: string; password: string }) {
+    const data = await request<{
+      token: string;
+      user: UserAccount;
+      workspace: WorkspaceData;
+    }>('/api/auth/claim-owner', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    setStoredToken(data.token);
+    return data;
+  },
+
   async login(payload: { email: string; password: string }) {
     const data = await request<{
       token: string;

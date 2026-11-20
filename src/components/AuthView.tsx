@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Lock, Mail } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Lock, Mail, ShieldCheck } from 'lucide-react';
 import { UserAccount, WorkspaceData } from '../types/business';
 import { api } from '../utils/api';
 import { BrandLogo } from './BrandLogo';
@@ -13,17 +13,39 @@ export const AuthView: React.FC<AuthViewProps> = ({
   onAuthenticated,
   embedded = false,
 }) => {
+  const [ownerConfigured, setOwnerConfigured] = useState<boolean>(true);
+  const [checkingStatus, setCheckingStatus] = useState<boolean>(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    api
+      .authStatus()
+      .then((res) => {
+        if (active) setOwnerConfigured(Boolean(res.ownerConfigured));
+      })
+      .catch(() => {
+        if (active) setOwnerConfigured(true);
+      })
+      .finally(() => {
+        if (active) setCheckingStatus(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
-      const result = await api.login({ email: email.trim(), password });
+      const result = ownerConfigured
+        ? await api.login({ email: email.trim(), password })
+        : await api.claimOwner({ email: email.trim(), password });
       onAuthenticated(result.user, result.workspace);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Authentication failed.');
@@ -43,6 +65,15 @@ export const AuthView: React.FC<AuthViewProps> = ({
           Your Style, Our Priority
         </p>
       </div>
+
+      {!checkingStatus && !ownerConfigured && (
+        <div className="mb-4 rounded-xl border border-[#E9D5FF] bg-[#FAF5FF] px-3.5 py-2.5 text-xs text-[#6B21A8] flex items-start gap-2">
+          <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5 text-[#7E22CE]" />
+          <span>
+            <strong>First-Run Owner Setup:</strong> Enter your owner Email &amp; Password to activate this workspace. This setup locks automatically after first login.
+          </span>
+        </div>
+      )}
 
       {error && (
         <div className="mb-4 rounded-xl border border-[#FECDD3] bg-[#FFF1F2] px-3.5 py-2.5 text-xs font-medium text-[#BE123C]">
@@ -78,7 +109,8 @@ export const AuthView: React.FC<AuthViewProps> = ({
             <input
               type="password"
               required
-              autoComplete="current-password"
+              minLength={6}
+              autoComplete={ownerConfigured ? 'current-password' : 'new-password'}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter your password"
@@ -89,10 +121,16 @@ export const AuthView: React.FC<AuthViewProps> = ({
 
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || checkingStatus}
           className="w-full py-3 rounded-xl bg-gradient-to-r from-[#DB2777] to-[#7E22CE] text-sm font-semibold text-white hover:opacity-95 transition-opacity cursor-pointer disabled:opacity-60"
         >
-          {loading ? 'Signing in...' : 'Sign In to Workspace'}
+          {checkingStatus
+            ? 'Checking...'
+            : loading
+            ? 'Please wait...'
+            : ownerConfigured
+            ? 'Sign In to Workspace'
+            : 'Activate Owner Login'}
         </button>
       </form>
 

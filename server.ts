@@ -120,13 +120,17 @@ function getSessionSecret(): string {
   if (process.env.SESSION_SECRET && process.env.SESSION_SECRET.length >= 16) {
     return process.env.SESSION_SECRET;
   }
-  ensureDataDir();
-  if (fs.existsSync(SECRET_FILE)) {
-    return fs.readFileSync(SECRET_FILE, 'utf8').trim();
+  try {
+    ensureDataDir();
+    if (fs.existsSync(SECRET_FILE)) {
+      return fs.readFileSync(SECRET_FILE, 'utf8').trim();
+    }
+    const generated = crypto.randomBytes(32).toString('hex');
+    fs.writeFileSync(SECRET_FILE, generated, { encoding: 'utf8', mode: 0o600 });
+    return generated;
+  } catch {
+    return crypto.randomBytes(32).toString('hex');
   }
-  const generated = crypto.randomBytes(32).toString('hex');
-  fs.writeFileSync(SECRET_FILE, generated, { encoding: 'utf8', mode: 0o600 });
-  return generated;
 }
 
 const SESSION_SECRET = getSessionSecret();
@@ -379,7 +383,61 @@ async function startServer(): Promise<void> {
     res.json({ status: 'ok', app: 'Glamour Galleria' });
   });
 
-  // AUTH ROUTES (Owner Login Only — Public Registration Disabled)
+  // AUTH ROUTES (Owner Login + One-Time First-Run Claim when no Secrets/DB owner exists)
+  app.get('/api/auth/status', (_req: Request, res: Response) => {
+    const envEmail = (process.env.ADMIN_EMAIL || '').trim().toLowerCase();
+    const envPassword = process.env.ADMIN_PASSWORD || '';
+    const ownerConfigured = Boolean(
+      dbState.users.length > 0 || (envEmail && envPassword)
+    );
+    res.json({ ownerConfigured });
+  });
+
+  app.post('/api/auth/claim-owner', async (req: Request, res: Response) => {
+    const envEmail = (process.env.ADMIN_EMAIL || '').trim().toLowerCase();
+    const envPassword = process.env.ADMIN_PASSWORD || '';
+    if (dbState.users.length > 0 || (envEmail && envPassword)) {
+      res.status(403).json({
+        error: 'Owner account is already configured. Please sign in.',
+      });
+      return;
+    }
+
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    const password = String(req.body?.password || '');
+    const name = String(req.body?.name || 'Glamour Galleria Owner').trim() || 'Owner';
+
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      res.status(400).json({ error: 'Please enter a valid email address.' });
+      return;
+    }
+    if (password.length < 6) {
+      res.status(400).json({ error: 'Password must be at least 6 characters long.' });
+      return;
+    }
+
+    const { hash, salt } = hashPassword(password);
+    const user: StoredUser = {
+      id: `usr-${crypto.randomUUID()}`,
+      name,
+      email,
+      passwordHash: hash,
+      salt,
+      createdAt: new Date().toISOString(),
+    };
+
+    dbState.users.push(user);
+    const workspace = getOrCreateWorkspace(user.id);
+    await persistDatabase();
+
+    const token = createAuthToken(user.id);
+    res.status(201).json({
+      token,
+      user: { id: user.id, name: user.name, email: user.email, createdAt: user.createdAt },
+      workspace,
+    });
+  });
+
   app.post('/api/auth/register', (_req: Request, res: Response) => {
     res.status(403).json({
       error: 'Account registration is disabled. Please sign in with the owner account.',
