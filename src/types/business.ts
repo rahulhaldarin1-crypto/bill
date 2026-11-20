@@ -1,5 +1,6 @@
 export type AppRoute =
   | 'dashboard'
+  | 'view-panel'
   | 'new-client'
   | 'client-list'
   | 'client-bill'

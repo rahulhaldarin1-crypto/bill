@@ -3,12 +3,12 @@ import {
   FilePlus2,
   Home,
   Package,
+  Search,
   Settings,
   Users,
 } from 'lucide-react';
 import { ClientBillView } from './components/ClientBillView';
 import { ClientListView } from './components/ClientListView';
-import { StartPortal } from './components/StartPortal';
 import { DashboardView } from './components/DashboardView';
 import { DeliveryTrackingView } from './components/DeliveryTrackingView';
 import { NewClientView } from './components/NewClientView';
@@ -17,6 +17,7 @@ import { ProductsView } from './components/ProductsView';
 import { ProfitLossView } from './components/ProfitLossView';
 import { SalesReportView } from './components/SalesReportView';
 import { SettingsView } from './components/SettingsView';
+import { ViewPanelView } from './components/ViewPanelView';
 import {
   AppRoute,
   BusinessSettings,
@@ -26,10 +27,9 @@ import {
   Invoice,
   PaymentMethod,
   Product,
-  UserAccount,
   WorkspaceData,
 } from './types/business';
-import { api, getStoredToken, setStoredToken } from './utils/api';
+import { api } from './utils/api';
 import { createEmptyWorkspace } from './utils/calculations';
 
 interface HistoryEntry {
@@ -38,8 +38,7 @@ interface HistoryEntry {
 }
 
 export default function App() {
-  const [authChecking, setAuthChecking] = useState(true);
-  const [user, setUser] = useState<UserAccount | null>(null);
+  const [loading, setLoading] = useState(true);
   const [workspace, setWorkspace] = useState<WorkspaceData>(createEmptyWorkspace);
 
   const [route, setRoute] = useState<AppRoute>('dashboard');
@@ -48,7 +47,6 @@ export default function App() {
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [billClientId, setBillClientId] = useState<string | null>(null);
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
-  const [showViewPanel, setShowViewPanel] = useState(false);
 
   const [toast, setToast] = useState<string | null>(null);
 
@@ -59,27 +57,20 @@ export default function App() {
     }, 2600);
   }, []);
 
-  // Restore authenticated session on mount
+  // Load workspace directly without login gate
   useEffect(() => {
-    const token = getStoredToken();
-    if (!token) {
-      setAuthChecking(false);
-      return;
-    }
-
     api
-      .fetchSession()
+      .fetchWorkspace()
       .then((data) => {
-        setUser(data.user);
-        setWorkspace(data.workspace);
+        setWorkspace(data);
       })
       .catch(() => {
-        setStoredToken(null);
+        showToast('Could not connect to server. Please refresh.');
       })
       .finally(() => {
-        setAuthChecking(false);
+        setLoading(false);
       });
-  }, []);
+  }, [showToast]);
 
   const navigateTo = useCallback(
     (
@@ -137,14 +128,6 @@ export default function App() {
     setSelectedClientId(null);
     setRoute('dashboard');
   }, [history]);
-
-  const handleSignOut = () => {
-    setStoredToken(null);
-    setUser(null);
-    setWorkspace(createEmptyWorkspace());
-    setRoute('dashboard');
-    setHistory([]);
-  };
 
   // CRUD HANDLERS
   const handleSaveClient = async (
@@ -333,7 +316,7 @@ export default function App() {
     showToast('Backup restored successfully.');
   };
 
-  if (authChecking) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-[#FDF9FC] flex items-center justify-center">
         <div className="text-sm font-semibold text-[#7E22CE]">
@@ -343,29 +326,13 @@ export default function App() {
     );
   }
 
-  if (!user || showViewPanel) {
-    return (
-      <StartPortal
-        isLoggedIn={Boolean(user)}
-        onBackToDashboard={() => setShowViewPanel(false)}
-        onAuthenticated={(authUser, authWorkspace) => {
-          setUser(authUser);
-          setWorkspace(authWorkspace);
-          setShowViewPanel(false);
-          setRoute('dashboard');
-          setHistory([]);
-        }}
-      />
-    );
-  }
-
   const currencySymbol = workspace.settings.currencySymbol || '₹';
 
   return (
     <div className="min-h-screen flex flex-col bg-[#FDF9FC] text-[#1F122B]">
       {/* TOP NAVIGATION BAR (Strict 3-zone contract) */}
       <header className="no-print sticky top-0 z-30 bg-white/95 backdrop-blur-xs border-b border-[#EFE2F5]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4 sm:gap-8">
           {/* Zone 1: Brand Wordmark */}
           <button
             type="button"
@@ -380,9 +347,9 @@ export default function App() {
             {(
               [
                 { id: 'dashboard', label: 'Dashboard' },
+                { id: 'view-panel', label: 'View Panel' },
                 { id: 'client-list', label: 'Clients' },
                 { id: 'products', label: 'Products' },
-                { id: 'sales-report', label: 'Reports' },
                 { id: 'settings', label: 'Settings' },
               ] as const
             ).map((nav) => {
@@ -424,9 +391,11 @@ export default function App() {
           <DashboardView
             workspace={workspace}
             onNavigate={(nextRoute) => navigateTo(nextRoute)}
-            onOpenViewPanel={() => setShowViewPanel(true)}
+            onOpenViewPanel={() => navigateTo('view-panel')}
           />
         )}
+
+        {route === 'view-panel' && <ViewPanelView onBack={goBack} />}
 
         {route === 'new-client' && (
           <NewClientView
@@ -527,21 +496,20 @@ export default function App() {
 
         {route === 'settings' && (
           <SettingsView
-            user={user}
             workspace={workspace}
             onBack={goBack}
             onSaveSettings={handleSaveSettings}
             onRestoreBackup={handleRestoreBackup}
-            onSignOut={handleSignOut}
           />
         )}
       </main>
 
-      {/* MOBILE BOTTOM NAVIGATION DOCK (Compact h-14, <= 15% combined sticky height) */}
-      <nav className="no-print md:hidden fixed bottom-0 left-0 right-0 z-30 h-14 bg-white/95 backdrop-blur-md border-t border-[#EFE2F5] grid grid-cols-4 items-center px-2">
+      {/* MOBILE BOTTOM NAVIGATION DOCK */}
+      <nav className="no-print md:hidden fixed bottom-0 left-0 right-0 z-30 h-14 bg-white/95 backdrop-blur-md border-t border-[#EFE2F5] grid grid-cols-5 items-center px-1">
         {(
           [
             { id: 'dashboard', label: 'Home', icon: Home },
+            { id: 'view-panel', label: 'View Bill', icon: Search },
             { id: 'client-list', label: 'Clients', icon: Users },
             { id: 'products', label: 'Products', icon: Package },
             { id: 'settings', label: 'Settings', icon: Settings },

@@ -11,40 +11,14 @@ import {
   WorkspaceData,
 } from '../types/business';
 
-const TOKEN_KEY = 'gg_auth_token_v1';
-
-export function getStoredToken(): string | null {
-  try {
-    return localStorage.getItem(TOKEN_KEY);
-  } catch {
-    return null;
-  }
-}
-
-export function setStoredToken(token: string | null): void {
-  try {
-    if (token) {
-      localStorage.setItem(TOKEN_KEY, token);
-    } else {
-      localStorage.removeItem(TOKEN_KEY);
-    }
-  } catch {
-    // ignore storage errors
-  }
-}
-
 async function request<T>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const token = getStoredToken();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(options.headers as Record<string, string> | undefined),
   };
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
-  }
 
   const res = await fetch(path, { ...options, headers });
   const data = await res.json().catch(() => ({}));
@@ -55,41 +29,8 @@ async function request<T>(
 }
 
 export const api = {
-  async register(payload: { name: string; email: string; password: string }) {
-    const data = await request<{
-      token: string;
-      user: UserAccount;
-      workspace: WorkspaceData;
-    }>('/api/auth/register', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    });
-    setStoredToken(data.token);
-    return data;
-  },
-
-  async login(payload: { email: string; password: string }) {
-    const data = await request<{
-      token: string;
-      user: UserAccount;
-      workspace: WorkspaceData;
-    }>('/api/auth/login', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    });
-    setStoredToken(data.token);
-    return data;
-  },
-
-  async fetchSession() {
-    return request<{ user: UserAccount; workspace: WorkspaceData }>('/api/auth/me');
-  },
-
-  async changePassword(currentPassword: string, newPassword: string) {
-    return request<{ ok: boolean }>('/api/auth/change-password', {
-      method: 'POST',
-      body: JSON.stringify({ currentPassword, newPassword }),
-    });
+  async fetchWorkspace() {
+    return request<WorkspaceData>('/api/workspace');
   },
 
   async updateSettings(settings: BusinessSettings) {

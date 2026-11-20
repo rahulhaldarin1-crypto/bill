@@ -2,14 +2,11 @@ import React, { useState } from 'react';
 import {
   ArrowLeft,
   Download,
-  Lock,
-  LogOut,
   RotateCcw,
   Save,
   Upload,
 } from 'lucide-react';
-import { BusinessSettings, UserAccount, WorkspaceData } from '../types/business';
-import { api } from '../utils/api';
+import { BusinessSettings, WorkspaceData } from '../types/business';
 import {
   DEFAULT_SETTINGS,
   resizeImageFileToDataUrl,
@@ -19,31 +16,22 @@ import { BrandLogo } from './BrandLogo';
 import { ConfirmModal } from './ConfirmModal';
 
 interface SettingsViewProps {
-  user: UserAccount;
   workspace: WorkspaceData;
   onBack: () => void;
   onSaveSettings: (next: BusinessSettings) => Promise<void>;
   onRestoreBackup: (data: WorkspaceData) => Promise<void>;
-  onSignOut: () => void;
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
-  user,
   workspace,
   onBack,
   onSaveSettings,
   onRestoreBackup,
-  onSignOut,
 }) => {
   const [draft, setDraft] = useState<BusinessSettings>(workspace.settings);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
-
-  // Password change
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [pwStatus, setPwStatus] = useState('');
 
   // Restore confirmation
   const [pendingRestore, setPendingRestore] = useState<WorkspaceData | null>(null);
@@ -108,19 +96,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     e.target.value = '';
   };
 
-  const handlePasswordChange = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setPwStatus('');
-    try {
-      await api.changePassword(currentPassword, newPassword);
-      setCurrentPassword('');
-      setNewPassword('');
-      setPwStatus('Password updated successfully.');
-    } catch (err) {
-      setPwStatus(err instanceof Error ? err.message : 'Password update failed.');
-    }
-  };
-
   const inputClass =
     'w-full rounded-xl border border-[#E6D9EE] bg-[#FDFBFE] px-3.5 py-2 text-sm text-[#1F122B] focus:border-[#9333EA] focus:bg-white focus:outline-none';
   const labelClass = 'block text-xs font-semibold text-[#4A3B59] mb-1.5';
@@ -139,22 +114,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           </button>
           <div>
             <h1 className="font-display-serif text-2xl font-bold text-[#1F122B]">
-              Settings, Backup &amp; Security
+              Settings &amp; Backup
             </h1>
             <p className="text-xs text-[#6B5B7B] mt-0.5">
-              Customize branding, invoice defaults, currency, backup/restore, and account security.
+              Customize branding, invoice defaults, UPI/bank details, currency, and backup/restore.
             </p>
           </div>
         </div>
-
-        <button
-          type="button"
-          onClick={onSignOut}
-          className="inline-flex items-center gap-1.5 rounded-xl border border-[#FECDD3] bg-[#FFF1F2] px-3.5 py-2 text-xs font-semibold text-[#BE123C] hover:bg-[#FFE4E6] cursor-pointer"
-        >
-          <LogOut className="w-3.5 h-3.5" />
-          <span>Sign Out</span>
-        </button>
       </div>
 
       {error && (
@@ -412,55 +378,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           </label>
         </div>
       </div>
-
-      {/* Account Security */}
-      <form
-        onSubmit={handlePasswordChange}
-        className="rounded-2xl border border-[#EFE2F5] bg-white p-5 sm:p-6 space-y-4"
-      >
-        <div className="flex items-center gap-2.5">
-          <Lock className="w-4 h-4 text-[#7E22CE]" />
-          <div>
-            <h2 className="text-base font-bold text-[#1F122B]">Account Security</h2>
-            <p className="text-xs text-[#6B5B7B]">
-              Signed in as <strong>{user.name}</strong> ({user.email})
-            </p>
-          </div>
-        </div>
-
-        {pwStatus && (
-          <div className="rounded-xl border border-[#E6D9EE] bg-[#FDF9FC] px-3.5 py-2 text-xs font-medium text-[#4A3B59]">
-            {pwStatus}
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <input
-            type="password"
-            required
-            value={currentPassword}
-            onChange={(e) => setCurrentPassword(e.target.value)}
-            placeholder="Current Password"
-            className={inputClass}
-          />
-          <input
-            type="password"
-            required
-            minLength={6}
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            placeholder="New Password (min 6 chars)"
-            className={inputClass}
-          />
-        </div>
-
-        <button
-          type="submit"
-          className="rounded-xl border border-[#E6D9EE] bg-white px-4 py-2 text-xs font-semibold text-[#1F122B] hover:border-[#9333EA] cursor-pointer"
-        >
-          Update Password
-        </button>
-      </form>
 
       <ConfirmModal
         open={Boolean(pendingRestore)}
